@@ -21,6 +21,13 @@ const RESULTS = [
   { db: "point",    sym: "#", en: "Point",    ar: "نقطة",     color: "bg-green-600 text-white" },
 ];
 
+const SUB_SKILLS = [
+  { code: "H", en: "High Ball", ar: "كرة عالية" },
+  { code: "Q", en: "Quick", ar: "هجوم سريع" },
+  { code: "F", en: "Fast", ar: "كرة سريعة الأطراف" },
+  { code: "P", en: "Pipe", ar: "بايب (هجوم خلفي)" }
+];
+
 const HOME_ZONES = [4, 3, 2, 5, 6, 1]; 
 const AWAY_ZONES = [1, 6, 5, 2, 3, 4];
 
@@ -48,7 +55,6 @@ export default function Scouting() {
   const [rawCodeInput, setRawCodeInput] = useState("");
   const inputRef = useRef(null);
 
-  // 1. Load Matches and Teams separately to avoid schema errors
   useEffect(() => {
     async function loadMatches() {
       setLoading(true);
@@ -60,24 +66,18 @@ export default function Scouting() {
           .limit(15);
         
         const { data: teamData } = await supabase.from("teams").select("id, name");
-        
         const tMap = {};
-        if (teamData) {
-          teamData.forEach(t => tMap[t.id] = t.name);
-        }
+        if (teamData) teamData.forEach(t => tMap[t.id] = t.name);
         
         setTeamsMap(tMap);
         setMatches(matchData || []);
         if (matchData?.length > 0) setMatchId(matchData[0].id);
-      } catch (e) {
-        console.error(e);
-      }
+      } catch (e) { console.error(e); }
       setLoading(false);
     }
     loadMatches();
   }, []);
 
-  // 2. Load Players for BOTH Home and Away Teams
   useEffect(() => {
     async function loadPlayers() {
       if (!matchId) return;
@@ -85,15 +85,12 @@ export default function Scouting() {
       if (!match) return;
 
       const awayTeamId = match.set_scores?.away_team_id;
-
       const teamIds = [];
       if (match.home_team_id) teamIds.push(match.home_team_id);
       if (awayTeamId) teamIds.push(awayTeamId);
 
       if (teamIds.length === 0) {
-        setHomePlayers([]);
-        setAwayPlayers([]);
-        return;
+        setHomePlayers([]); setAwayPlayers([]); return;
       }
 
       const { data } = await supabase
@@ -108,13 +105,11 @@ export default function Scouting() {
       
       setHomeCourt({ 1: null, 2: null, 3: null, 4: null, 5: null, 6: null });
       setAwayCourt({ 1: null, 2: null, 3: null, 4: null, 5: null, 6: null });
-      setSelectedPlayer(null);
-      setSelectedPlayerTeam(null);
+      setSelectedPlayer(null); setSelectedPlayerTeam(null);
     }
     loadPlayers();
   }, [matchId, matches]);
 
-  // 3. Load Events
   const loadEvents = useCallback(async () => {
     if (!matchId) return;
     const { data } = await supabase
@@ -162,9 +157,7 @@ export default function Scouting() {
     const { data, error } = await supabase.from("scouting_events").insert(payload).select("*, players(id, full_name, jersey_number, team_id)").single();
     if (!error) {
       setEvents(prev => [...prev, data]);
-      setSelectedPlayer(null);
-      setSelectedPlayerTeam(null);
-      setSelectedSkill(null);
+      setSelectedPlayer(null); setSelectedPlayerTeam(null); setSelectedSkill(null);
       if (inputRef.current) inputRef.current.focus();
     }
   };
@@ -182,15 +175,17 @@ export default function Scouting() {
     else if (code.startsWith('A') || code.startsWith('#')) { isHome = false; prefix = code[0]; code = code.slice(1); }
     else { isHome = true; } 
 
-    const matchRegex = code.match(/^(\d{1,2})([SREABDF])([=\-/+#])$/);
+    // Advanced Regex for DV4: e.g. *12A#HQ (allows subskills at the end)
+    const matchRegex = code.match(/^(\d{1,2})([SREABDF])([=\-/+#])([HQFP]?)$/);
     if (!matchRegex) {
-      alert(isAR ? "كود خاطئ. مثال: *12A# أو a5S=" : "Invalid code. Example: *12A# or a5S=");
+      alert(isAR ? "كود خاطئ (DV4). مثال: *12A# أو a5SQ=" : "Invalid DV4 Code. Example: *12A# or a5SQ=");
       return;
     }
 
     const jersey = parseInt(matchRegex[1], 10);
     const skillCode = matchRegex[2];
     const resultCode = matchRegex[3];
+    const subSkill = matchRegex[4] || "";
 
     const s = SKILLS.find(x => x.code === skillCode);
     const r = RESULTS.find(x => x.sym === resultCode);
@@ -202,7 +197,7 @@ export default function Scouting() {
     const p = roster.find(x => x.jersey_number === jersey);
     if (p) pId = p.id;
 
-    const finalCodeStr = `${prefix}${jersey}${skillCode}${resultCode}`;
+    const finalCodeStr = `${prefix}${jersey}${skillCode}${subSkill}${resultCode}`;
     const payload = { match_id: matchId, player_id: pId, skill: s.db, result: r.db, notes: `RAW:${finalCodeStr}` };
     
     const { data, error } = await supabase.from("scouting_events").insert(payload).select("*, players(id, full_name, jersey_number, team_id)").single();
@@ -297,11 +292,13 @@ export default function Scouting() {
   }, [events, homePlayers, awayPlayers, homeName, awayName]);
 
   return (
-    <div className="min-h-screen bg-[#dcdcdc] text-black font-sans pb-10">
-      <div className="bg-black p-2 flex items-center justify-between text-white">
+    <div className="min-h-screen bg-[#111111] text-gray-100 font-sans pb-10">
+      
+      {/* Top Navbar */}
+      <div className="bg-[#000000] p-2 flex items-center justify-between text-white border-b border-gray-800">
         <div className="flex gap-4 items-center">
-          <span className="font-bold text-lg px-4 text-red-500">DATA SCOUT</span>
-          <select value={matchId} onChange={e => setMatchId(e.target.value)} className="bg-gray-800 text-white rounded px-2 py-1 outline-none text-sm border border-gray-600">
+          <span className="font-bold text-lg px-4 text-blue-500 tracking-widest uppercase">Data Volley 4</span>
+          <select value={matchId} onChange={e => setMatchId(e.target.value)} className="bg-gray-800 text-white rounded px-3 py-1.5 outline-none text-sm border border-gray-700 focus:border-blue-500 font-medium shadow-inner">
             {matches.map(m => {
               const hName = m.home_team_id ? teamsMap[m.home_team_id] : "Home Team";
               const aName = m.set_scores?.away_team_id ? teamsMap[m.set_scores.away_team_id] : "Away Team";
@@ -309,65 +306,68 @@ export default function Scouting() {
             })}
           </select>
         </div>
-        <div className="text-xs text-gray-400 pe-4">
-          {isAR ? "الكود: [* أو a أو #][رقم اللاعب][المهارة][التقييم]" : "Code: [*/a/#][Player][Skill][Result]"}
+        <div className="text-xs text-gray-500 pe-4 font-mono">
+          Syntax: [*/a][#][Skill][Type][Result]
         </div>
       </div>
 
       <div className="p-4 max-w-[1500px] mx-auto">
+        
+        {/* Scoreboard */}
         <div className="flex justify-center items-center gap-4 mb-6">
-          <div className="bg-red-600 text-white font-bold text-xl md:text-2xl px-6 md:px-16 py-2 rounded shadow text-center min-w-[150px] truncate">{homeName}</div>
-          <div className="bg-red-600 text-white font-black text-4xl px-4 py-2 rounded shadow">{ourScore}</div>
-          <div className="flex flex-col text-gray-500 font-bold items-center leading-none text-xl">
-            <span>+</span><span>-</span>
-          </div>
-          <div className="bg-blue-800 text-white font-black text-4xl px-4 py-2 rounded shadow">{oppScore}</div>
-          <div className="bg-blue-800 text-white font-bold text-xl md:text-2xl px-6 md:px-16 py-2 rounded shadow text-center min-w-[150px] truncate">{awayName}</div>
+          <div className="bg-[#1a1a1a] text-white border-l-4 border-l-red-600 font-bold text-xl md:text-2xl px-6 md:px-16 py-3 shadow-lg text-center min-w-[200px] truncate">{homeName}</div>
+          <div className="bg-red-600 text-white font-black text-5xl px-6 py-2 shadow-lg">{ourScore}</div>
+          <div className="flex flex-col text-gray-600 font-black items-center leading-none text-3xl px-2">:</div>
+          <div className="bg-blue-800 text-white font-black text-5xl px-6 py-2 shadow-lg">{oppScore}</div>
+          <div className="bg-[#1a1a1a] text-white border-r-4 border-r-blue-800 font-bold text-xl md:text-2xl px-6 md:px-16 py-3 shadow-lg text-center min-w-[200px] truncate">{awayName}</div>
         </div>
 
         <div className="flex gap-4 items-start flex-col xl:flex-row">
           
-          <div className="w-full xl:w-48 flex flex-col gap-1 bg-white p-2 rounded shadow">
-            <h3 className="font-bold border-b pb-1 mb-2 text-center text-red-700 truncate">{homeName}</h3>
-            <div className="flex flex-row xl:flex-col overflow-x-auto xl:overflow-visible gap-2 xl:gap-1 pb-2 xl:pb-0">
+          {/* Home Roster Sidebar */}
+          <div className="w-full xl:w-56 flex flex-col gap-1 bg-[#1a1a1a] p-3 rounded-lg shadow-xl border border-gray-800">
+            <h3 className="font-bold border-b border-gray-800 pb-2 mb-3 text-center text-red-500 truncate uppercase tracking-widest text-xs">{homeName}</h3>
+            <div className="flex flex-row xl:flex-col overflow-x-auto xl:overflow-visible gap-2 xl:gap-1.5 pb-2 xl:pb-0">
               {homePlayers.map(p => (
-                <div key={p.id} className="flex gap-2 items-center text-sm font-semibold cursor-pointer hover:bg-gray-200 p-1 rounded shrink-0"
+                <div key={p.id} className={`flex gap-3 items-center text-sm font-semibold cursor-pointer p-1.5 rounded transition-all ${selectedPlayer === p.id ? "bg-gray-800 border-l-2 border-red-500" : "hover:bg-gray-800"}`}
                      onClick={() => selectPlayerForAction(p.id, 'home')}>
-                  <span className={`w-6 text-center rounded ${p.position === 'libero' ? 'bg-yellow-300 text-black' : 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded ${p.position === 'libero' ? 'bg-yellow-500 text-black' : 'bg-gray-700 text-gray-300'}`}>
                     {p.jersey_number}
                   </span>
-                  <span className={selectedPlayer === p.id ? "text-red-600 font-black" : "text-gray-800"}>{p.full_name.split(" ")[0]}</span>
+                  <span className={selectedPlayer === p.id ? "text-white" : "text-gray-400"}>{p.full_name.split(" ").slice(0,2).join(" ")}</span>
                 </div>
               ))}
-              {homePlayers.length === 0 && <div className="text-xs text-center text-gray-500 py-4">No players</div>}
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-2 flex-1 w-full">
-            <div className="flex flex-col items-center border-[3px] border-black p-1 bg-white relative">
-              <div className="w-[300px] sm:w-[350px] h-[150px] sm:h-[175px] bg-[#d9d9d9] grid grid-cols-3 grid-rows-2">
+          <div className="flex flex-col items-center gap-4 flex-1 w-full">
+            
+            {/* Visual Court Grid DV4 Style */}
+            <div className="flex flex-col items-center border-4 border-orange-500/20 p-2 bg-[#222] relative rounded-xl shadow-2xl">
+              <div className="w-[300px] sm:w-[400px] h-[150px] sm:h-[200px] bg-[#df9753] grid grid-cols-3 grid-rows-2 shadow-inner relative">
                 {AWAY_ZONES.map(z => {
                   const pId = awayCourt[z];
                   const p = awayPlayers.find(x => x.id === pId);
                   const isSel = selectedPlayer === pId && pId !== null;
                   return (
-                    <div key={`away-${z}`} className="flex items-center justify-center relative">
+                    <div key={`away-${z}`} className="flex items-center justify-center relative border border-white/10">
+                      <span className="absolute top-1 left-1 text-[10px] font-black text-white/30 z-0">{z}</span>
                       {p ? (
                         <button onClick={() => selectPlayerForAction(p.id, 'away')} onDoubleClick={() => setRosterZoneOpen({ side: 'away', zone: z })}
-                          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full font-bold flex items-center justify-center text-xl transition-all shadow-lg border-2 ${
-                            isSel ? "bg-white text-blue-800 border-blue-800 ring-2 ring-blue-800 scale-110" : "bg-blue-800 text-white border-black"
+                          className={`z-10 w-10 h-10 sm:w-14 sm:h-14 rounded-full font-black flex items-center justify-center text-lg sm:text-xl transition-all shadow-xl border-2 ${
+                            isSel ? "bg-white text-blue-800 border-blue-800 ring-4 ring-blue-800/30 scale-125" : "bg-blue-800 text-white border-[#df9753]"
                           }`}>
                           {p.jersey_number}
                         </button>
                       ) : (
-                        <button onClick={() => setRosterZoneOpen({ side: 'away', zone: z })} className="w-12 h-12 rounded-full bg-white/50 border border-dashed border-gray-500 text-gray-500 font-bold hover:bg-white">+</button>
+                        <button onClick={() => setRosterZoneOpen({ side: 'away', zone: z })} className="w-10 h-10 rounded-full bg-black/10 border-2 border-dashed border-white/30 text-white/50 font-bold hover:bg-black/20">+</button>
                       )}
                       {rosterZoneOpen.side === 'away' && rosterZoneOpen.zone === z && (
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 bg-white border border-gray-400 rounded shadow-2xl z-50 p-1 max-h-40 overflow-y-auto">
-                          <div className="text-[10px] text-gray-500 font-bold mb-1 text-center bg-gray-100 py-1">Away Zone {z}</div>
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 p-1 max-h-48 overflow-y-auto">
+                          <div className="text-[10px] text-gray-400 font-bold mb-1 text-center bg-gray-800 py-1 rounded">Assign Zone {z}</div>
                           {awayPlayers.map(pl => (
-                            <div key={pl.id} onClick={() => assignToCourt('away', z, pl.id)} className="text-xs p-1.5 hover:bg-blue-100 cursor-pointer text-black border-b border-gray-100">
-                              <span className="font-bold mr-1">#{pl.jersey_number}</span> {pl.full_name}
+                            <div key={pl.id} onClick={() => assignToCourt('away', z, pl.id)} className="text-xs p-2 hover:bg-gray-800 cursor-pointer text-gray-200 border-b border-gray-800">
+                              <span className="font-bold text-blue-400 mr-2">#{pl.jersey_number}</span> {pl.full_name}
                             </div>
                           ))}
                         </div>
@@ -376,30 +376,33 @@ export default function Scouting() {
                   );
                 })}
               </div>
-              <div className="w-[320px] sm:w-[370px] h-1.5 bg-black my-1"></div>
-              <div className="w-[300px] sm:w-[350px] h-[150px] sm:h-[175px] bg-[#d9d9d9] grid grid-cols-3 grid-rows-2">
+              
+              <div className="w-[320px] sm:w-[420px] h-2 bg-white my-1 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
+              
+              <div className="w-[300px] sm:w-[400px] h-[150px] sm:h-[200px] bg-[#df9753] grid grid-cols-3 grid-rows-2 shadow-inner relative">
                 {HOME_ZONES.map(z => {
                   const pId = homeCourt[z];
                   const p = homePlayers.find(x => x.id === pId);
                   const isSel = selectedPlayer === pId && pId !== null;
                   return (
-                    <div key={`home-${z}`} className="flex items-center justify-center relative">
+                    <div key={`home-${z}`} className="flex items-center justify-center relative border border-white/10">
+                      <span className="absolute bottom-1 right-1 text-[10px] font-black text-white/30 z-0">{z}</span>
                       {p ? (
                         <button onClick={() => selectPlayerForAction(p.id, 'home')} onDoubleClick={() => setRosterZoneOpen({ side: 'home', zone: z })}
-                          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full font-bold flex items-center justify-center text-xl transition-all shadow-lg border-2 ${
-                            isSel ? "bg-white text-red-600 border-red-600 ring-2 ring-red-600 scale-110" : "bg-red-600 text-white border-black"
+                          className={`z-10 w-10 h-10 sm:w-14 sm:h-14 rounded-full font-black flex items-center justify-center text-lg sm:text-xl transition-all shadow-xl border-2 ${
+                            isSel ? "bg-white text-red-600 border-red-600 ring-4 ring-red-600/30 scale-125" : "bg-red-600 text-white border-[#df9753]"
                           }`}>
                           {p.jersey_number}
                         </button>
                       ) : (
-                        <button onClick={() => setRosterZoneOpen({ side: 'home', zone: z })} className="w-12 h-12 rounded-full bg-white/50 border-2 border-dashed border-gray-500 text-gray-500 font-bold hover:bg-white">+</button>
+                        <button onClick={() => setRosterZoneOpen({ side: 'home', zone: z })} className="w-10 h-10 rounded-full bg-black/10 border-2 border-dashed border-white/30 text-white/50 font-bold hover:bg-black/20">+</button>
                       )}
                       {rosterZoneOpen.side === 'home' && rosterZoneOpen.zone === z && (
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 bg-white border border-gray-400 rounded shadow-2xl z-50 p-1 max-h-40 overflow-y-auto">
-                          <div className="text-[10px] text-gray-500 font-bold mb-1 text-center bg-gray-100 py-1">Home Zone {z}</div>
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 p-1 max-h-48 overflow-y-auto">
+                          <div className="text-[10px] text-gray-400 font-bold mb-1 text-center bg-gray-800 py-1 rounded">Assign Zone {z}</div>
                           {homePlayers.map(pl => (
-                            <div key={pl.id} onClick={() => assignToCourt('home', z, pl.id)} className="text-xs p-1.5 hover:bg-red-100 cursor-pointer text-black border-b border-gray-100">
-                              <span className="font-bold mr-1">#{pl.jersey_number}</span> {pl.full_name}
+                            <div key={pl.id} onClick={() => assignToCourt('home', z, pl.id)} className="text-xs p-2 hover:bg-gray-800 cursor-pointer text-gray-200 border-b border-gray-800">
+                              <span className="font-bold text-red-400 mr-2">#{pl.jersey_number}</span> {pl.full_name}
                             </div>
                           ))}
                         </div>
@@ -410,70 +413,87 @@ export default function Scouting() {
               </div>
             </div>
 
-            <form onSubmit={handleCodeSubmit} className="w-full max-w-[400px] flex mt-2 shadow border-2 border-red-600 rounded overflow-hidden focus-within:ring-2 focus-within:ring-red-400 transition-all">
-              <span className="bg-red-600 text-white font-bold px-3 py-2 text-sm flex items-center justify-center uppercase">Code</span>
-              <input ref={inputRef} value={rawCodeInput} onChange={(e) => setRawCodeInput(e.target.value)}
-                placeholder="*12A# or a4S="
-                className="flex-1 bg-white px-3 py-2 outline-none font-mono text-lg uppercase tracking-widest text-black focus:bg-yellow-50 transition-colors text-center"
-                autoComplete="off" />
-              <button type="submit" className="hidden">Submit</button>
-            </form>
+            {/* Input & Action Pad */}
+            <div className="w-full max-w-[420px]">
+              <form onSubmit={handleCodeSubmit} className="flex mb-4 shadow-xl border border-gray-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition-all bg-gray-900">
+                <span className="bg-gray-800 text-blue-500 font-bold px-4 py-3 text-xs flex items-center justify-center uppercase tracking-widest border-r border-gray-700">INPUT</span>
+                <input ref={inputRef} value={rawCodeInput} onChange={(e) => setRawCodeInput(e.target.value)}
+                  placeholder="e.g. *12A#HQ or a4S="
+                  className="flex-1 bg-gray-900 px-4 py-3 outline-none font-mono text-xl uppercase tracking-widest text-white placeholder-gray-600 transition-colors"
+                  autoComplete="off" />
+                <button type="submit" className="hidden">Submit</button>
+              </form>
 
-            <div className="w-full max-w-[400px] bg-white p-3 rounded shadow border border-gray-300 mt-2">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="font-bold text-gray-700 text-sm">Action Pad</h3>
-                <div className="flex items-center gap-2">
-                  <span className={`font-black text-lg ${selectedPlayerTeam === 'away' ? 'text-blue-600' : 'text-red-600'}`}>
-                    {selectedPlayer ? `#${getPlayerById(selectedPlayer)?.jersey_number}` : "—"}
-                  </span>
-                  <span className="font-black text-gray-800 text-lg">{selectedSkill ? SKILLS.find(s=>s.db===selectedSkill)?.code : "—"}</span>
+              <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-xl border border-gray-800">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-gray-500 text-xs tracking-widest uppercase">Action Interface</h3>
+                  <div className="flex items-center gap-3 bg-black px-3 py-1 rounded-lg border border-gray-800">
+                    <span className={`font-black text-xl ${selectedPlayerTeam === 'away' ? 'text-blue-500' : 'text-red-500'}`}>
+                      {selectedPlayer ? `#${getPlayerById(selectedPlayer)?.jersey_number}` : "--"}
+                    </span>
+                    <span className="text-gray-600">|</span>
+                    <span className="font-black text-white text-xl">{selectedSkill ? SKILLS.find(s=>s.db===selectedSkill)?.code : "-"}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <div className="grid grid-cols-4 gap-1 flex-1">
-                  {SKILLS.map(s => (
-                    <button key={s.db} onClick={() => setSelectedSkill(s.db)}
-                      className={`py-2 text-sm font-bold border rounded ${selectedSkill === s.db ? "bg-gray-800 border-black text-white" : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"}`}>
-                      {s.code}
-                    </button>
-                  ))}
+                
+                <div className="flex gap-3">
+                  <div className="grid grid-cols-4 gap-2 flex-1">
+                    {SKILLS.map(s => (
+                      <button key={s.db} onClick={() => setSelectedSkill(s.db)}
+                        className={`py-3 text-sm font-black rounded-lg transition-all ${selectedSkill === s.db ? "bg-white text-black shadow-[0_0_10px_white]" : "bg-gray-800 border-b-4 border-gray-900 text-gray-400 hover:bg-gray-700 hover:text-white"}`}>
+                        {s.code}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-col gap-2 w-16">
+                    {RESULTS.map(r => (
+                      <button key={r.db} onClick={() => handleResultClick(r.db)}
+                        className={`flex-1 font-black rounded-lg shadow-lg text-lg transition-all hover:brightness-110 active:scale-95 py-2 ${r.color}`}>
+                        {r.sym}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1 w-16">
-                  {RESULTS.map(r => (
-                    <button key={r.db} onClick={() => handleResultClick(r.db)}
-                      className={`flex-1 font-bold rounded shadow-sm text-sm ${r.color} hover:opacity-80 active:scale-95 py-1`}>
-                      {r.sym}
-                    </button>
-                  ))}
+
+                <div className="mt-4 pt-4 border-t border-gray-800">
+                  <div className="text-[10px] text-gray-600 mb-2 uppercase tracking-widest font-bold">Sub-Skills (Hit Types)</div>
+                  <div className="flex gap-2">
+                    {SUB_SKILLS.map(sk => (
+                      <button key={sk.code} onClick={() => setRawCodeInput(prev => prev + sk.code)}
+                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-1.5 rounded text-xs font-mono font-bold transition-colors border border-gray-700">
+                        {sk.code}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Away Roster Sidebar & Event Log */}
           <div className="w-full xl:w-64 flex flex-col gap-4">
             
-            <div className="flex flex-col gap-1 bg-white p-2 rounded shadow">
-              <h3 className="font-bold border-b pb-1 mb-2 text-center text-blue-800 truncate">{awayName}</h3>
-              <div className="flex flex-row xl:flex-col overflow-x-auto xl:overflow-visible gap-2 xl:gap-1 pb-2 xl:pb-0">
+            <div className="flex flex-col gap-1 bg-[#1a1a1a] p-3 rounded-lg shadow-xl border border-gray-800">
+              <h3 className="font-bold border-b border-gray-800 pb-2 mb-3 text-center text-blue-500 truncate uppercase tracking-widest text-xs">{awayName}</h3>
+              <div className="flex flex-row xl:flex-col overflow-x-auto xl:overflow-visible gap-2 xl:gap-1.5 pb-2 xl:pb-0">
                 {awayPlayers.map(p => (
-                  <div key={p.id} className="flex gap-2 items-center text-sm font-semibold cursor-pointer hover:bg-gray-200 p-1 rounded shrink-0"
+                  <div key={p.id} className={`flex gap-3 items-center text-sm font-semibold cursor-pointer p-1.5 rounded transition-all ${selectedPlayer === p.id ? "bg-gray-800 border-l-2 border-blue-500" : "hover:bg-gray-800"}`}
                        onClick={() => selectPlayerForAction(p.id, 'away')}>
-                    <span className={`w-6 text-center rounded ${p.position === 'libero' ? 'bg-yellow-300 text-black' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded ${p.position === 'libero' ? 'bg-yellow-500 text-black' : 'bg-gray-700 text-gray-300'}`}>
                       {p.jersey_number}
                     </span>
-                    <span className={selectedPlayer === p.id ? "text-blue-800 font-black" : "text-gray-800"}>{p.full_name.split(" ")[0]}</span>
+                    <span className={selectedPlayer === p.id ? "text-white" : "text-gray-400"}>{p.full_name.split(" ").slice(0,2).join(" ")}</span>
                   </div>
                 ))}
-                {awayPlayers.length === 0 && <div className="text-xs text-center text-gray-500 py-4">No players</div>}
               </div>
             </div>
 
-            <div className="bg-white rounded shadow border border-gray-300 flex-1 overflow-hidden flex flex-col min-h-[250px] xl:max-h-96">
-              <div className="bg-gray-200 p-2 text-xs font-bold flex justify-between items-center border-b border-gray-300">
-                <span>CODES LIST</span>
-                <button onClick={undoLast} className="bg-white px-2 py-0.5 rounded border border-gray-400 text-gray-700 hover:bg-gray-100 shadow-sm">Undo</button>
+            <div className="bg-[#1a1a1a] rounded-lg shadow-xl border border-gray-800 flex-1 overflow-hidden flex flex-col min-h-[250px] xl:max-h-96">
+              <div className="bg-gray-900 p-3 text-[10px] uppercase tracking-widest font-bold text-gray-500 flex justify-between items-center border-b border-gray-800">
+                <span>Data Volley Log</span>
+                <button onClick={undoLast} className="bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded text-white transition-colors">Undo</button>
               </div>
-              <div className="overflow-y-auto p-1 text-sm font-mono flex-1 bg-white">
+              <div className="overflow-y-auto p-2 text-sm font-mono flex-1 bg-[#111]">
                 {[...events].reverse().map(e => {
                   let codeStr = "";
                   if (e.notes?.startsWith("RAW:")) {
@@ -484,12 +504,12 @@ export default function Scouting() {
                     const isAwayTeamEv = awayPlayers.some(p => p.id === e.player_id);
                     codeStr = `${isAwayTeamEv ? 'a' : '*'}${e.players?.jersey_number || "?"}${s?.code}${r?.sym}`;
                   }
-                  const isHome = !codeStr.startsWith("A") && !codeStr.startsWith("#") && !codeStr.startsWith("a");
+                  const isHome = !codeStr.startsWith("a") && !codeStr.startsWith("A") && !codeStr.startsWith("#");
 
                   return (
-                    <div key={e.id} className="flex gap-2 p-1 border-b border-gray-100 hover:bg-gray-100 items-center">
-                      <span className="text-gray-400 text-xs w-12">{new Date(e.created_at).toLocaleTimeString([],{minute:'2-digit',second:'2-digit'})}</span>
-                      <span className={isHome ? "text-red-700 font-bold bg-red-50 px-1 rounded" : "text-blue-700 font-bold bg-blue-50 px-1 rounded"}>
+                    <div key={e.id} className="flex gap-3 p-1.5 border-b border-gray-800 hover:bg-gray-900 items-center transition-colors">
+                      <span className="text-gray-600 text-[10px] w-12">{new Date(e.created_at).toLocaleTimeString([],{minute:'2-digit',second:'2-digit'})}</span>
+                      <span className={isHome ? "text-red-400 font-bold" : "text-blue-400 font-bold"}>
                         {codeStr}
                       </span>
                     </div>
@@ -501,40 +521,44 @@ export default function Scouting() {
           </div>
         </div>
 
-        <div className="mt-6 bg-white rounded shadow border border-gray-300">
-          <div className="bg-gray-200 p-2 text-sm font-bold border-b border-gray-300">MATCH ANALYSIS</div>
+        {/* Analytics Table */}
+        <div className="mt-8 bg-[#1a1a1a] rounded-xl shadow-2xl border border-gray-800 overflow-hidden">
+          <div className="bg-gray-900 p-4 text-xs font-bold uppercase tracking-widest text-gray-400 border-b border-gray-800 flex items-center justify-between">
+            <span>Statistical Analysis Engine</span>
+            <span className="text-[10px] bg-red-600/20 text-red-500 px-2 py-1 rounded">DV4 Simulation</span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-gray-100 text-gray-700 text-xs uppercase border-b border-gray-300">
+              <thead className="bg-[#111] text-gray-500 text-[10px] uppercase tracking-wider border-b border-gray-800">
                 <tr>
-                  <th className="p-2 border-r border-gray-300">Team</th>
-                  <th className="p-2 border-r border-gray-300">Player</th>
-                  <th className="p-2 text-center text-green-700 bg-green-50">Pts</th>
-                  <th className="p-2 text-center text-red-700 border-r border-gray-300 bg-red-50">Err</th>
-                  <th className="p-2 text-center">Att Tot</th>
-                  <th className="p-2 text-center text-blue-700 font-bold">Att %</th>
-                  <th className="p-2 text-center border-r border-gray-300 text-red-600">Att Err</th>
-                  <th className="p-2 text-center text-blue-700 font-bold border-r border-gray-300">Rec %</th>
-                  <th className="p-2 text-center border-r border-gray-300 text-orange-600">Srv Err</th>
+                  <th className="p-3 border-r border-gray-800">Team</th>
+                  <th className="p-3 border-r border-gray-800">Player</th>
+                  <th className="p-3 text-center text-green-500">Pts</th>
+                  <th className="p-3 text-center text-red-500 border-r border-gray-800">Err</th>
+                  <th className="p-3 text-center">Att Tot</th>
+                  <th className="p-3 text-center text-white font-bold">Att %</th>
+                  <th className="p-3 text-center border-r border-gray-800 text-red-400">Att Err</th>
+                  <th className="p-3 text-center text-white font-bold border-r border-gray-800">Rec %</th>
+                  <th className="p-3 text-center text-orange-400">Srv Err</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-gray-800 bg-[#1a1a1a]">
                 {playerStats.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="p-2 border-r border-gray-300 font-bold text-xs uppercase">
-                      <span className={p.isHome ? "text-red-600" : "text-blue-600"}>{p.team}</span>
+                  <tr key={p.id} className="hover:bg-gray-900 transition-colors">
+                    <td className="p-3 border-r border-gray-800 font-bold text-xs uppercase">
+                      <span className={p.isHome ? "text-red-500" : "text-blue-500"}>{p.team}</span>
                     </td>
-                    <td className="p-2 border-r border-gray-300 font-bold text-gray-800">#{p.jersey} {p.name}</td>
-                    <td className="p-2 text-center font-bold text-green-600 bg-green-50/50">{p.pts}</td>
-                    <td className="p-2 text-center font-bold text-red-600 border-r border-gray-300 bg-red-50/50">{p.err}</td>
-                    <td className="p-2 text-center text-gray-600">{p.att}</td>
-                    <td className="p-2 text-center font-bold text-blue-600">{p.attEff}</td>
-                    <td className="p-2 text-center text-red-600 border-r border-gray-300">{p.attErr}</td>
-                    <td className="p-2 text-center font-bold text-blue-600 border-r border-gray-300">{p.recEff}</td>
-                    <td className="p-2 text-center text-orange-600 border-r border-gray-300">{p.srvErr}</td>
+                    <td className="p-3 border-r border-gray-800 font-bold text-gray-300">#{p.jersey} {p.name}</td>
+                    <td className="p-3 text-center font-bold text-green-500">{p.pts}</td>
+                    <td className="p-3 text-center font-bold text-red-500 border-r border-gray-800">{p.err}</td>
+                    <td className="p-3 text-center text-gray-500">{p.att}</td>
+                    <td className="p-3 text-center font-black text-white">{p.attEff}</td>
+                    <td className="p-3 text-center text-red-400 border-r border-gray-800">{p.attErr}</td>
+                    <td className="p-3 text-center font-black text-white border-r border-gray-800">{p.recEff}</td>
+                    <td className="p-3 text-center text-orange-400">{p.srvErr}</td>
                   </tr>
                 ))}
-                {playerStats.length === 0 && <tr><td colSpan="9" className="p-4 text-center text-gray-500">No events logged yet</td></tr>}
+                {playerStats.length === 0 && <tr><td colSpan="9" className="p-8 text-center text-gray-600 uppercase tracking-widest text-xs">Awaiting scouting input</td></tr>}
               </tbody>
             </table>
           </div>
