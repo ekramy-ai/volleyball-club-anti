@@ -114,13 +114,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white">{t("dashboard_title")}</h1>
-            <button onClick={seedDatabase} className="bg-yellow-500 hover:bg-yellow-600 text-black text-xs font-bold px-2 py-1 rounded shadow" title="Temporary Seed Button">🚀 Seed Test Data</button>
-          </div>
+          <h1 className="text-2xl font-bold text-white">{t("dashboard_title")}</h1>
           <p className="text-gray-400 text-sm mt-0.5">{t("dashboard_welcome")} · {dateStr}</p>
         </div>
         <div className="flex flex-wrap gap-2">

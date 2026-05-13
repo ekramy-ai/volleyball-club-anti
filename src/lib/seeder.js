@@ -34,8 +34,7 @@ const generatePlayers = (clubId, teamId, clubName) => {
       height_cm: 185 + Math.floor(Math.random() * 25), // 185 - 210
       weight_kg: 80 + Math.floor(Math.random() * 20),
       nationality: "Egyptian",
-      experience_level: i < 14 ? "professional" : "advanced",
-      notes: JSON.stringify({ is_active_roster: i < 14 })
+      experience_level: i < 14 ? "professional" : "advanced"
     });
   }
   return players;
