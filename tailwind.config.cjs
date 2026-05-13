@@ -1,6 +1,6 @@
 // tailwind.config.cjs
 module.exports = {
-  darkMode: 'class', // enable class-based dark mode
+  darkMode: 'class',
   content: [
     './index.html',
     './xura-system.jsx',
@@ -8,7 +8,11 @@ module.exports = {
     './features/**/*.{js,ts,jsx,tsx}'
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'Tajawal', 'sans-serif'],
+      },
+    },
   },
   plugins: [],
 };

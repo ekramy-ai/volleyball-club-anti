@@ -1,4 +1,4 @@
-// xura-system.jsx — XURA System main entry point
+// xura-system.jsx — XURA System main entry point (bilingual AR/EN)
 import React, { Suspense, lazy, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -8,41 +8,44 @@ import {
   NavLink,
   Navigate,
 } from "react-router-dom";
+import { I18nextProvider, useTranslation } from "react-i18next";
+import i18n, { switchLanguage } from "./src/i18n.js";
 import "./src/index.css";
 
-// ─── Lazy feature modules ───────────────────────────────────────────────────
-const Dashboard   = lazy(() => import("./features/dashboard/Dashboard"));
-const Teams       = lazy(() => import("./features/teams/Teams"));
-const Players     = lazy(() => import("./features/players/Players"));
-const Matches     = lazy(() => import("./features/matches/Matches"));
-const Scouting    = lazy(() => import("./features/scouting/Scouting"));
-const VideoAnalysis = lazy(() => import("./features/video/VideoAnalysis"));
-const Analytics   = lazy(() => import("./features/analytics/Analytics"));
-const Training    = lazy(() => import("./features/training/Training"));
-const AIAssistant = lazy(() => import("./features/ai/AIAssistant"));
-const Reports     = lazy(() => import("./features/reports/Reports"));
-const Settings    = lazy(() => import("./features/settings/Settings"));
+// ─── Lazy feature modules ─────────────────────────────────────────────────────
+const Dashboard    = lazy(() => import("./features/dashboard/Dashboard"));
+const Teams        = lazy(() => import("./features/teams/Teams"));
+const Players      = lazy(() => import("./features/players/Players"));
+const Matches      = lazy(() => import("./features/matches/Matches"));
+const Scouting     = lazy(() => import("./features/scouting/Scouting"));
+const VideoAnalysis= lazy(() => import("./features/video/VideoAnalysis"));
+const Analytics    = lazy(() => import("./features/analytics/Analytics"));
+const Training     = lazy(() => import("./features/training/Training"));
+const AIAssistant  = lazy(() => import("./features/ai/AIAssistant"));
+const Reports      = lazy(() => import("./features/reports/Reports"));
+const Settings     = lazy(() => import("./features/settings/Settings"));
 
-// ─── Nav items ───────────────────────────────────────────────────────────────
-const NAV = [
-  { label: "Dashboard",      path: "/dashboard",  icon: "⚡" },
-  { label: "Teams",          path: "/teams",       icon: "👥" },
-  { label: "Players",        path: "/players",     icon: "🤾" },
-  { label: "Matches",        path: "/matches",     icon: "🏐" },
-  { label: "Scouting",       path: "/scouting",    icon: "📡" },
-  { label: "Video Analysis", path: "/video",       icon: "🎬" },
-  { label: "Analytics",      path: "/analytics",   icon: "📊" },
-  { label: "Training",       path: "/training",    icon: "💪" },
-  { label: "AI Assistant",   path: "/ai",          icon: "🤖" },
-  { label: "Reports",        path: "/reports",     icon: "📄" },
-  { label: "Settings",       path: "/settings",    icon: "⚙️" },
-];
-
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
 function Sidebar({ collapsed, setCollapsed }) {
+  const { t } = useTranslation();
+
+  const NAV = [
+    { key: "nav_dashboard", path: "/dashboard", icon: "⚡" },
+    { key: "nav_teams",     path: "/teams",     icon: "👥" },
+    { key: "nav_players",   path: "/players",   icon: "🤾" },
+    { key: "nav_matches",   path: "/matches",   icon: "🏐" },
+    { key: "nav_scouting",  path: "/scouting",  icon: "📡" },
+    { key: "nav_video",     path: "/video",     icon: "🎬" },
+    { key: "nav_analytics", path: "/analytics", icon: "📊" },
+    { key: "nav_training",  path: "/training",  icon: "💪" },
+    { key: "nav_ai",        path: "/ai",        icon: "🤖" },
+    { key: "nav_reports",   path: "/reports",   icon: "📄" },
+    { key: "nav_settings",  path: "/settings",  icon: "⚙️" },
+  ];
+
   return (
     <aside
-      className={`flex flex-col bg-gray-900 border-r border-gray-800 transition-all duration-300 ${
+      className={`flex flex-col bg-gray-900 border-e border-gray-800 transition-all duration-300 ${
         collapsed ? "w-16" : "w-60"
       } min-h-screen`}
     >
@@ -55,28 +58,24 @@ function Sidebar({ collapsed, setCollapsed }) {
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="text-gray-400 hover:text-white transition-colors ml-auto"
+          className="text-gray-400 hover:text-white transition-colors ms-auto"
           aria-label="Toggle sidebar"
         >
           {collapsed ? "▶" : "◀"}
         </button>
       </div>
 
-      {/* Navigation */}
+      {/* Nav */}
       <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
         {NAV.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
-            className={({ isActive }) =>
-              `sidebar-link ${isActive ? "active" : ""}`
-            }
-            title={collapsed ? item.label : undefined}
+            className={({ isActive }) => `sidebar-link ${isActive ? "active" : ""}`}
+            title={collapsed ? t(item.key) : undefined}
           >
             <span className="text-lg leading-none">{item.icon}</span>
-            {!collapsed && (
-              <span className="text-sm font-medium">{item.label}</span>
-            )}
+            {!collapsed && <span className="text-sm font-medium">{t(item.key)}</span>}
           </NavLink>
         ))}
       </nav>
@@ -84,22 +83,40 @@ function Sidebar({ collapsed, setCollapsed }) {
       {/* Footer */}
       {!collapsed && (
         <div className="px-4 py-3 border-t border-gray-800 text-xs text-gray-600">
-          XURA v1.0 © {new Date().getFullYear()}
+          {t("common_copyright")} © {new Date().getFullYear()}
         </div>
       )}
     </aside>
   );
 }
 
-// ─── Top Bar ─────────────────────────────────────────────────────────────────
+// ─── Language Switcher ────────────────────────────────────────────────────────
+function LangSwitcher() {
+  const { i18n: i } = useTranslation();
+  const isAR = i.language === "ar";
+
+  const toggle = () => switchLanguage(isAR ? "en" : "ar");
+
+  return (
+    <button
+      onClick={toggle}
+      className="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors border border-gray-700"
+      title="Switch language / تغيير اللغة"
+    >
+      <span>{isAR ? "🇺🇸 EN" : "🇸🇦 عربي"}</span>
+    </button>
+  );
+}
+
+// ─── Top Bar ──────────────────────────────────────────────────────────────────
 function TopBar() {
+  const { t } = useTranslation();
   return (
     <header className="h-14 bg-gray-900/80 backdrop-blur border-b border-gray-800 flex items-center justify-between px-6 sticky top-0 z-30">
-      <div className="text-sm text-gray-400 font-medium">
-        Professional Volleyball Management Platform
-      </div>
+      <div className="text-sm text-gray-400 font-medium">{t("app_tagline")}</div>
       <div className="flex items-center gap-3">
-        <span className="badge bg-red-900/60 text-red-400">● Live</span>
+        <LangSwitcher />
+        <span className="badge bg-red-900/60 text-red-400">{t("common_live")}</span>
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white text-xs font-bold">
           SA
         </div>
@@ -111,8 +128,8 @@ function TopBar() {
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
   state = { hasError: false, error: null };
-  static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  componentDidCatch(error, info) { console.error("XURA Error:", error, info); }
+  static getDerivedStateFromError(e) { return { hasError: true, error: e }; }
+  componentDidCatch(e, info) { console.error("XURA Error:", e, info); }
   render() {
     if (this.state.hasError) {
       return (
@@ -120,10 +137,7 @@ class ErrorBoundary extends React.Component {
           <div className="text-5xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold text-red-400 mb-2">Something went wrong</h2>
           <p className="text-gray-400 mb-6">{this.state.error?.message}</p>
-          <button
-            onClick={() => this.setState({ hasError: false, error: null })}
-            className="btn-primary"
-          >
+          <button onClick={() => this.setState({ hasError: false, error: null })} className="btn-primary">
             Try Again
           </button>
         </div>
@@ -133,19 +147,20 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// ─── Page Loader ─────────────────────────────────────────────────────────────
+// ─── Page Loader ──────────────────────────────────────────────────────────────
 function PageLoader() {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-center h-64">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-gray-400 text-sm">Loading module…</span>
+        <span className="text-gray-400 text-sm">{t("common_loading")}</span>
       </div>
     </div>
   );
 }
 
-// ─── App ─────────────────────────────────────────────────────────────────────
+// ─── App ──────────────────────────────────────────────────────────────────────
 function App() {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -159,7 +174,7 @@ function App() {
             <ErrorBoundary>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/"           element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard"  element={<Dashboard />} />
                   <Route path="/teams"      element={<Teams />} />
                   <Route path="/players"    element={<Players />} />
@@ -190,7 +205,11 @@ function App() {
 // ─── Mount ────────────────────────────────────────────────────────────────────
 const container = document.getElementById("root");
 if (container) {
-  createRoot(container).render(<App />);
+  createRoot(container).render(
+    <I18nextProvider i18n={i18n}>
+      <App />
+    </I18nextProvider>
+  );
 }
 
 export default App;
