@@ -11,6 +11,7 @@ function MatchModal({ match, onClose, onSaved }) {
   const [teams, setTeams] = useState([]);
   const [form, setForm] = useState({
     home_team_id: match?.home_team_id || "",
+    away_team_id: match?.away_team_id || "",
     competition:  match?.competition  || "",
     venue:        match?.venue        || "",
     match_date:   match?.match_date ? new Date(match.match_date).toISOString().slice(0, 16) : "",
@@ -30,25 +31,38 @@ function MatchModal({ match, onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (form.home_team_id === form.away_team_id && form.home_team_id !== "") {
+      setError(isAR ? "لا يمكن أن يكون الفريقان متطابقين!" : "Home and Away teams cannot be the same!");
+      return;
+    }
+
     setLoading(true); setError("");
     
-    // Optional opponent logic could be added here. We'll leave it null for now.
     const payload = { ...form };
     if (!payload.home_team_id) payload.home_team_id = null;
+    if (!payload.away_team_id) payload.away_team_id = null;
     if (payload.match_date) payload.match_date = new Date(payload.match_date).toISOString();
     else payload.match_date = null;
 
     try {
+      // NOTE: For this to work perfectly, you must alter the away_team_id foreign key in Supabase 
+      // to reference the 'teams' table instead of 'opponents'.
+      // SQL: ALTER TABLE matches DROP CONSTRAINT matches_away_team_id_fkey;
+      //      ALTER TABLE matches ADD CONSTRAINT matches_away_team_id_fkey FOREIGN KEY (away_team_id) REFERENCES teams(id) ON DELETE SET NULL;
       let result;
       if (isEdit) {
-        const { data, error: err } = await supabase.from("matches").update(payload).eq("id", match.id).select("*, teams(name)").single();
+        const { data, error: err } = await supabase.from("matches").update(payload).eq("id", match.id).select("*, home:teams!home_team_id(name), away:teams!away_team_id(name)").single();
         if (err) throw err; result = data;
       } else {
-        const { data, error: err } = await supabase.from("matches").insert(payload).select("*, teams(name)").single();
+        const { data, error: err } = await supabase.from("matches").insert(payload).select("*, home:teams!home_team_id(name), away:teams!away_team_id(name)").single();
         if (err) throw err; result = data;
       }
       onSaved(result, isEdit);
-    } catch (err) { setError(err.message); } finally { setLoading(false); }
+    } catch (err) { 
+      setError(err.message + " (Note: Run the SQL query provided by the assistant to fix foreign key if it's an away_team_id error)"); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
@@ -61,13 +75,23 @@ function MatchModal({ match, onClose, onSaved }) {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && <div className="bg-red-900/40 border border-red-700 text-red-300 text-sm rounded-lg px-3 py-2">⚠️ {error}</div>}
           
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">{isAR ? "الفريق" : "Team"}</label>
-            <select value={form.home_team_id} onChange={(e) => set("home_team_id", e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500">
-              <option value="">-- {isAR ? "اختر الفريق" : "Select Team"} --</option>
-              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-red-400 mb-1">{isAR ? "الفريق (Home)" : "Home Team"}</label>
+              <select value={form.home_team_id} onChange={(e) => set("home_team_id", e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500">
+                <option value="">-- {isAR ? "اختر" : "Select"} --</option>
+                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-blue-400 mb-1">{isAR ? "الخصم (Away)" : "Away Team"}</label>
+              <select value={form.away_team_id} onChange={(e) => set("away_team_id", e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                <option value="">-- {isAR ? "اختر" : "Select"} --</option>
+                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
           </div>
           <div>
             <label className="block text-xs text-gray-400 mb-1">{isAR ? "البطولة / المنافسة" : "Competition"}</label>
@@ -120,7 +144,8 @@ export default function Matches() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const { data, error: err } = await supabase.from("matches").select("*, teams(name)").order("match_date", { ascending: true });
+      // Fetching relations. Because we altered away_team_id to reference teams, we alias them:
+      const { data, error: err } = await supabase.from("matches").select("*, home:teams!home_team_id(name), away:teams!away_team_id(name)").order("match_date", { ascending: true });
       if (err) throw err;
       setMatches(data || []);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
@@ -152,7 +177,7 @@ export default function Matches() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">{t("nav_matches")}</h1>
-            <p className="text-gray-400 text-sm mt-0.5">{isAR ? "جدولة وإدارة كافة المباريات" : "Schedule and manage all your matches"}</p>
+            <p className="text-gray-400 text-sm mt-0.5">{isAR ? "المباريات بين الفرق المسجلة بالنظام" : "Matches between registered teams"}</p>
           </div>
           <button onClick={() => setModal("create")} className="btn-primary text-sm">➕ {isAR ? "جدولة مباراة" : "Schedule Match"}</button>
         </div>
@@ -160,21 +185,9 @@ export default function Matches() {
         {error && (
           <div className="card border-red-800 bg-red-900/20 text-red-300 text-sm flex items-start gap-3">
             <span className="text-xl">⚠️</span>
-            <div>
-              <p className="font-semibold">{t("common_supabase_error")}</p>
-              <p className="text-xs mt-0.5">{error}</p>
-            </div>
+            <div><p className="font-semibold">{t("common_supabase_error")}</p><p className="text-xs mt-0.5">{error}</p></div>
           </div>
         )}
-
-        <div className="flex gap-2 border-b border-gray-800 pb-0 overflow-x-auto">
-          {TABS.map((t_name) => (
-            <button key={t_name} onClick={() => setTab(t_name)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap -mb-px ${tab === t_name ? "border-red-500 text-red-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}>
-              {t_name}
-            </button>
-          ))}
-        </div>
 
         {loading ? (
           <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -182,8 +195,7 @@ export default function Matches() {
           <div className="card flex flex-col items-center justify-center py-20 text-center">
             <div className="text-5xl mb-4">🏐</div>
             <h2 className="text-lg font-semibold text-white mb-2">{isAR ? "لا توجد مباريات" : "No matches found"}</h2>
-            <p className="text-gray-400 text-sm mb-6">{isAR ? "قم بجدولة أول مباراة للبدء." : "Schedule your first match to get started."}</p>
-            <button onClick={() => setModal("create")} className="btn-primary">➕ {isAR ? "جدولة مباراة" : "Schedule Match"}</button>
+            <button onClick={() => setModal("create")} className="btn-primary mt-4">➕ {isAR ? "جدولة مباراة" : "Schedule Match"}</button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -197,19 +209,19 @@ export default function Matches() {
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between text-center mb-6">
+                <div className="flex items-center justify-between text-center mb-6 px-4">
                   <div className="flex-1">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-gray-800 flex items-center justify-center mb-2">
-                       <span className="text-lg">🛡️</span>
+                    <div className="w-12 h-12 mx-auto rounded-full bg-red-900/30 border border-red-800 flex items-center justify-center mb-2">
+                       <span className="text-lg">🔴</span>
                     </div>
-                    <div className="font-semibold text-white text-sm">{m.teams?.name || (isAR ? "فريق غير محدد" : "Unknown Team")}</div>
+                    <div className="font-bold text-white text-sm">{m.home?.name || "Unknown"}</div>
                   </div>
-                  <div className="px-4 text-gray-500 text-sm font-bold">VS</div>
+                  <div className="px-2 text-gray-500 text-xs font-black uppercase tracking-widest">VS</div>
                   <div className="flex-1">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-gray-800 flex items-center justify-center mb-2">
-                       <span className="text-lg">❓</span>
+                    <div className="w-12 h-12 mx-auto rounded-full bg-blue-900/30 border border-blue-800 flex items-center justify-center mb-2">
+                       <span className="text-lg">🔵</span>
                     </div>
-                    <div className="font-semibold text-white text-sm">{isAR ? "الخصم" : "Opponent"}</div>
+                    <div className="font-bold text-white text-sm">{m.away?.name || "Unknown"}</div>
                   </div>
                 </div>
 
