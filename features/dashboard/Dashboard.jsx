@@ -1,16 +1,46 @@
 // features/dashboard/Dashboard.jsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { supabase } from "../../src/lib/supabase";
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const isAR = i18n.language === "ar";
+  
+  const [counts, setCounts] = useState({ players: 0, teams: 0, matches: 0, scouting: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadStats() {
+      setLoading(true);
+      try {
+        const [plRes, tmRes, mtRes, scRes] = await Promise.all([
+          supabase.from("players").select("id", { count: "exact" }),
+          supabase.from("teams").select("id", { count: "exact" }),
+          supabase.from("matches").select("id", { count: "exact" }),
+          supabase.from("scouting_events").select("id", { count: "exact" }),
+        ]);
+
+        setCounts({
+          players: plRes.count || 0,
+          teams: tmRes.count || 0,
+          matches: mtRes.count || 0,
+          scouting: scRes.count || 0,
+        });
+      } catch (err) {
+        console.error("Dashboard stats error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadStats();
+  }, []);
 
   const stats = [
-    { key: "dashboard_total_players",   sub: "dashboard_registered_athletes", icon: "🤾", color: "from-red-600 to-red-800" },
-    { key: "dashboard_active_teams",    sub: "dashboard_current_season",       icon: "👥", color: "from-blue-600 to-blue-800" },
-    { key: "dashboard_matches_played",  sub: "dashboard_this_season",          icon: "🏐", color: "from-purple-600 to-purple-800" },
-    { key: "dashboard_scouting_events", sub: "dashboard_total_recorded",       icon: "📡", color: "from-green-600 to-green-800" },
+    { key: "dashboard_total_players",   sub: "dashboard_registered_athletes", icon: "🤾", color: "from-red-600 to-red-800", value: counts.players },
+    { key: "dashboard_active_teams",    sub: "dashboard_current_season",       icon: "👥", color: "from-blue-600 to-blue-800", value: counts.teams },
+    { key: "dashboard_matches_played",  sub: "dashboard_this_season",          icon: "🏐", color: "from-purple-600 to-purple-800", value: counts.matches },
+    { key: "dashboard_scouting_events", sub: "dashboard_total_recorded",       icon: "📡", color: "from-green-600 to-green-800", value: counts.scouting },
   ];
 
   const quickActions = [
@@ -56,9 +86,10 @@ export default function Dashboard() {
             <div className="relative">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-2xl">{s.icon}</span>
-                <span className="badge bg-gray-800 text-gray-400">↑ 0%</span>
               </div>
-              <div className="text-3xl font-bold text-white mb-1">0</div>
+              <div className="text-3xl font-bold text-white mb-1">
+                {loading ? <span className="animate-pulse bg-gray-800 text-transparent rounded">000</span> : s.value}
+              </div>
               <div className="text-sm font-medium text-gray-300">{t(s.key)}</div>
               <div className="text-xs text-gray-500 mt-0.5">{t(s.sub)}</div>
             </div>

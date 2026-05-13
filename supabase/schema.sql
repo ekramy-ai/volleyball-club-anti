@@ -216,18 +216,18 @@ CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(session_id);
 -- ─────────────────────────────────────────────
 -- ROW LEVEL SECURITY
 -- ─────────────────────────────────────────────
-ALTER TABLE clubs             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE seasons           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE teams             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE players           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE matches           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE scouting_events   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE training_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE attendance        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE injuries          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE videos            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE profiles          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE opponents         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clubs             DISABLE ROW LEVEL SECURITY;
+ALTER TABLE seasons           DISABLE ROW LEVEL SECURITY;
+ALTER TABLE teams             DISABLE ROW LEVEL SECURITY;
+ALTER TABLE players           DISABLE ROW LEVEL SECURITY;
+ALTER TABLE matches           DISABLE ROW LEVEL SECURITY;
+ALTER TABLE scouting_events   DISABLE ROW LEVEL SECURITY;
+ALTER TABLE training_sessions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE attendance        DISABLE ROW LEVEL SECURITY;
+ALTER TABLE injuries          DISABLE ROW LEVEL SECURITY;
+ALTER TABLE videos            DISABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles          DISABLE ROW LEVEL SECURITY;
+ALTER TABLE opponents         DISABLE ROW LEVEL SECURITY;
 
 -- Profiles: each user sees/edits their own
 CREATE POLICY "profiles_select_own" ON profiles FOR SELECT USING (auth.uid() = id);
