@@ -29,6 +29,7 @@ export default function Scouting() {
   const isAR = i18n.language === "ar";
 
   const [matches, setMatches] = useState([]);
+  const [teamsMap, setTeamsMap] = useState({});
   const [homePlayers, setHomePlayers] = useState([]);
   const [awayPlayers, setAwayPlayers] = useState([]);
   const [events, setEvents] = useState([]);
@@ -37,8 +38,8 @@ export default function Scouting() {
   const [homeCourt, setHomeCourt] = useState({ 1: null, 2: null, 3: null, 4: null, 5: null, 6: null });
   const [awayCourt, setAwayCourt] = useState({ 1: null, 2: null, 3: null, 4: null, 5: null, 6: null });
   
-  const [selectedPlayer, setSelectedPlayer] = useState(null); // id
-  const [selectedPlayerTeam, setSelectedPlayerTeam] = useState(null); // 'home' or 'away'
+  const [selectedPlayer, setSelectedPlayer] = useState(null); 
+  const [selectedPlayerTeam, setSelectedPlayerTeam] = useState(null); 
   const [selectedSkill, setSelectedSkill] = useState(null);
   
   const [loading, setLoading] = useState(true);
@@ -47,18 +48,30 @@ export default function Scouting() {
   const [rawCodeInput, setRawCodeInput] = useState("");
   const inputRef = useRef(null);
 
-  // 1. Load Matches
+  // 1. Load Matches and Teams separately to avoid schema errors
   useEffect(() => {
     async function loadMatches() {
       setLoading(true);
-      const { data } = await supabase
-        .from("matches")
-        .select("id, competition, home_team_id, away_team_id, home:teams!home_team_id(name), away:teams!away_team_id(name)")
-        .order("match_date", { ascending: false })
-        .limit(15);
-      
-      setMatches(data || []);
-      if (data?.length > 0) setMatchId(data[0].id);
+      try {
+        const { data: matchData } = await supabase
+          .from("matches")
+          .select("*")
+          .order("match_date", { ascending: false })
+          .limit(15);
+        
+        const { data: teamData } = await supabase.from("teams").select("id, name");
+        
+        const tMap = {};
+        if (teamData) {
+          teamData.forEach(t => tMap[t.id] = t.name);
+        }
+        
+        setTeamsMap(tMap);
+        setMatches(matchData || []);
+        if (matchData?.length > 0) setMatchId(matchData[0].id);
+      } catch (e) {
+        console.error(e);
+      }
       setLoading(false);
     }
     loadMatches();
@@ -71,9 +84,11 @@ export default function Scouting() {
       const match = matches.find(m => m.id === matchId);
       if (!match) return;
 
+      const awayTeamId = match.set_scores?.away_team_id;
+
       const teamIds = [];
       if (match.home_team_id) teamIds.push(match.home_team_id);
-      if (match.away_team_id) teamIds.push(match.away_team_id);
+      if (awayTeamId) teamIds.push(awayTeamId);
 
       if (teamIds.length === 0) {
         setHomePlayers([]);
@@ -89,9 +104,8 @@ export default function Scouting() {
       
       const allPlayers = data || [];
       setHomePlayers(allPlayers.filter(p => p.team_id === match.home_team_id));
-      setAwayPlayers(allPlayers.filter(p => p.team_id === match.away_team_id));
+      setAwayPlayers(allPlayers.filter(p => p.team_id === awayTeamId));
       
-      // Clear court and selections
       setHomeCourt({ 1: null, 2: null, 3: null, 4: null, 5: null, 6: null });
       setAwayCourt({ 1: null, 2: null, 3: null, 4: null, 5: null, 6: null });
       setSelectedPlayer(null);
@@ -113,7 +127,6 @@ export default function Scouting() {
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
-  // Keep focus on input
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
@@ -133,7 +146,6 @@ export default function Scouting() {
     return homePlayers.find(p => p.id === pId) || awayPlayers.find(p => p.id === pId);
   };
 
-  // Submit via Button Clicks
   const handleResultClick = async (resDb) => {
     if (!matchId) return alert(isAR ? "اختر المباراة" : "Select match");
     if (!selectedPlayer) return alert(isAR ? "اختر اللاعب أولاً" : "Select player first");
@@ -157,7 +169,6 @@ export default function Scouting() {
     }
   };
 
-  // Submit via Text Input
   const handleCodeSubmit = async (e) => {
     e.preventDefault();
     if (!matchId) return alert(isAR ? "اختر المباراة" : "Select match");
@@ -169,17 +180,17 @@ export default function Scouting() {
     let prefix = '*';
     if (code.startsWith('*')) { isHome = true; code = code.slice(1); }
     else if (code.startsWith('A') || code.startsWith('#')) { isHome = false; prefix = code[0]; code = code.slice(1); }
-    else { isHome = true; } // Default Home if no prefix
+    else { isHome = true; } 
 
-    const match = code.match(/^(\d{1,2})([SREABDF])([=\-/+#])$/);
-    if (!match) {
+    const matchRegex = code.match(/^(\d{1,2})([SREABDF])([=\-/+#])$/);
+    if (!matchRegex) {
       alert(isAR ? "كود خاطئ. مثال: *12A# أو a5S=" : "Invalid code. Example: *12A# or a5S=");
       return;
     }
 
-    const jersey = parseInt(match[1], 10);
-    const skillCode = match[2];
-    const resultCode = match[3];
+    const jersey = parseInt(matchRegex[1], 10);
+    const skillCode = matchRegex[2];
+    const resultCode = matchRegex[3];
 
     const s = SKILLS.find(x => x.code === skillCode);
     const r = RESULTS.find(x => x.sym === resultCode);
@@ -220,8 +231,8 @@ export default function Scouting() {
   };
 
   const matchInfo = matches.find(m => m.id === matchId);
-  const homeName = matchInfo?.home?.name || "HOME";
-  const awayName = matchInfo?.away?.name || "AWAY";
+  const homeName = matchInfo?.home_team_id ? (teamsMap[matchInfo.home_team_id] || "Home Team") : "Home Team";
+  const awayName = matchInfo?.set_scores?.away_team_id ? (teamsMap[matchInfo.set_scores.away_team_id] || "Away Team") : "Away Team";
 
   let ourScore = 0;
   let oppScore = 0;
@@ -291,11 +302,15 @@ export default function Scouting() {
         <div className="flex gap-4 items-center">
           <span className="font-bold text-lg px-4 text-red-500">DATA SCOUT</span>
           <select value={matchId} onChange={e => setMatchId(e.target.value)} className="bg-gray-800 text-white rounded px-2 py-1 outline-none text-sm border border-gray-600">
-            {matches.map(m => <option key={m.id} value={m.id}>{m.home?.name || "Home"} vs {m.away?.name || "Away"}</option>)}
+            {matches.map(m => {
+              const hName = m.home_team_id ? teamsMap[m.home_team_id] : "Home Team";
+              const aName = m.set_scores?.away_team_id ? teamsMap[m.set_scores.away_team_id] : "Away Team";
+              return <option key={m.id} value={m.id}>{hName} vs {aName}</option>;
+            })}
           </select>
         </div>
         <div className="text-xs text-gray-400 pe-4">
-          {isAR ? "الكود: [* أو a أو #][رقم اللاعب][المهارة][التقييم] مثال: *12A#" : "Code: [*/a/#][Player][Skill][Result] e.g: *12A#"}
+          {isAR ? "الكود: [* أو a أو #][رقم اللاعب][المهارة][التقييم]" : "Code: [*/a/#][Player][Skill][Result]"}
         </div>
       </div>
 
@@ -312,7 +327,6 @@ export default function Scouting() {
 
         <div className="flex gap-4 items-start flex-col xl:flex-row">
           
-          {/* LEFT: HOME ROSTER */}
           <div className="w-full xl:w-48 flex flex-col gap-1 bg-white p-2 rounded shadow">
             <h3 className="font-bold border-b pb-1 mb-2 text-center text-red-700 truncate">{homeName}</h3>
             <div className="flex flex-row xl:flex-col overflow-x-auto xl:overflow-visible gap-2 xl:gap-1 pb-2 xl:pb-0">
@@ -329,10 +343,8 @@ export default function Scouting() {
             </div>
           </div>
 
-          {/* CENTER: COURT & INPUT PAD */}
           <div className="flex flex-col items-center gap-2 flex-1 w-full">
             <div className="flex flex-col items-center border-[3px] border-black p-1 bg-white relative">
-              {/* Away Court */}
               <div className="w-[300px] sm:w-[350px] h-[150px] sm:h-[175px] bg-[#d9d9d9] grid grid-cols-3 grid-rows-2">
                 {AWAY_ZONES.map(z => {
                   const pId = awayCourt[z];
@@ -365,7 +377,6 @@ export default function Scouting() {
                 })}
               </div>
               <div className="w-[320px] sm:w-[370px] h-1.5 bg-black my-1"></div>
-              {/* Home Court */}
               <div className="w-[300px] sm:w-[350px] h-[150px] sm:h-[175px] bg-[#d9d9d9] grid grid-cols-3 grid-rows-2">
                 {HOME_ZONES.map(z => {
                   const pId = homeCourt[z];
@@ -408,7 +419,6 @@ export default function Scouting() {
               <button type="submit" className="hidden">Submit</button>
             </form>
 
-            {/* ACTION PAD UNDER COURT */}
             <div className="w-full max-w-[400px] bg-white p-3 rounded shadow border border-gray-300 mt-2">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-bold text-gray-700 text-sm">Action Pad</h3>
@@ -440,7 +450,6 @@ export default function Scouting() {
             </div>
           </div>
 
-          {/* RIGHT: AWAY ROSTER & CODES LIST */}
           <div className="w-full xl:w-64 flex flex-col gap-4">
             
             <div className="flex flex-col gap-1 bg-white p-2 rounded shadow">
@@ -492,7 +501,6 @@ export default function Scouting() {
           </div>
         </div>
 
-        {/* ANALYSIS TABLE */}
         <div className="mt-6 bg-white rounded shadow border border-gray-300">
           <div className="bg-gray-200 p-2 text-sm font-bold border-b border-gray-300">MATCH ANALYSIS</div>
           <div className="overflow-x-auto">

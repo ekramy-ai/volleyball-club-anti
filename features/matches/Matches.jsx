@@ -9,9 +9,13 @@ function MatchModal({ match, onClose, onSaved }) {
   const isEdit = Boolean(match?.id);
   
   const [teams, setTeams] = useState([]);
+  
+  // Extract away_team_id from set_scores JSONB to avoid schema FK errors
+  const savedAwayTeamId = match?.set_scores?.away_team_id || "";
+
   const [form, setForm] = useState({
     home_team_id: match?.home_team_id || "",
-    away_team_id: match?.away_team_id || "",
+    away_team_id: savedAwayTeamId,
     competition:  match?.competition  || "",
     venue:        match?.venue        || "",
     match_date:   match?.match_date ? new Date(match.match_date).toISOString().slice(0, 16) : "",
@@ -38,28 +42,31 @@ function MatchModal({ match, onClose, onSaved }) {
 
     setLoading(true); setError("");
     
-    const payload = { ...form };
-    if (!payload.home_team_id) payload.home_team_id = null;
-    if (!payload.away_team_id) payload.away_team_id = null;
-    if (payload.match_date) payload.match_date = new Date(payload.match_date).toISOString();
+    // We store the away team inside set_scores JSON to bypass the foreign key constraint on away_team_id pointing to opponents
+    const payload = {
+      home_team_id: form.home_team_id || null,
+      competition: form.competition,
+      venue: form.venue,
+      status: form.status,
+      notes: form.notes,
+      set_scores: { ...(match?.set_scores || {}), away_team_id: form.away_team_id || null }
+    };
+
+    if (form.match_date) payload.match_date = new Date(form.match_date).toISOString();
     else payload.match_date = null;
 
     try {
-      // NOTE: For this to work perfectly, you must alter the away_team_id foreign key in Supabase 
-      // to reference the 'teams' table instead of 'opponents'.
-      // SQL: ALTER TABLE matches DROP CONSTRAINT matches_away_team_id_fkey;
-      //      ALTER TABLE matches ADD CONSTRAINT matches_away_team_id_fkey FOREIGN KEY (away_team_id) REFERENCES teams(id) ON DELETE SET NULL;
       let result;
       if (isEdit) {
-        const { data, error: err } = await supabase.from("matches").update(payload).eq("id", match.id).select("*, home:teams!home_team_id(name), away:teams!away_team_id(name)").single();
+        const { data, error: err } = await supabase.from("matches").update(payload).eq("id", match.id).select("*").single();
         if (err) throw err; result = data;
       } else {
-        const { data, error: err } = await supabase.from("matches").insert(payload).select("*, home:teams!home_team_id(name), away:teams!away_team_id(name)").single();
+        const { data, error: err } = await supabase.from("matches").insert(payload).select("*").single();
         if (err) throw err; result = data;
       }
       onSaved(result, isEdit);
     } catch (err) { 
-      setError(err.message + " (Note: Run the SQL query provided by the assistant to fix foreign key if it's an away_team_id error)"); 
+      setError(err.message); 
     } finally { 
       setLoading(false); 
     }
@@ -137,6 +144,7 @@ export default function Matches() {
   const TABS = isAR ? ["الكل", "قادمة", "مكتملة", "مباشر"] : ["All", "Upcoming", "Completed", "Live"];
   const [tab, setTab] = useState(TABS[0]);
   const [matches, setMatches] = useState([]);
+  const [teamsMap, setTeamsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modal, setModal] = useState(null);
@@ -144,10 +152,18 @@ export default function Matches() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      // Fetching relations. Because we altered away_team_id to reference teams, we alias them:
-      const { data, error: err } = await supabase.from("matches").select("*, home:teams!home_team_id(name), away:teams!away_team_id(name)").order("match_date", { ascending: true });
-      if (err) throw err;
-      setMatches(data || []);
+      // 1. Fetch matches
+      const { data: matchData, error: matchErr } = await supabase.from("matches").select("*").order("match_date", { ascending: true });
+      if (matchErr) throw matchErr;
+      
+      // 2. Fetch teams mapping to manually assign names without relying on complex SQL foreign keys
+      const { data: teamData, error: teamErr } = await supabase.from("teams").select("id, name");
+      if (teamErr) throw teamErr;
+      
+      const tMap = {};
+      teamData.forEach(t => tMap[t.id] = t.name);
+      setTeamsMap(tMap);
+      setMatches(matchData || []);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }, []);
 
@@ -199,43 +215,49 @@ export default function Matches() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {matches.map((m) => (
-              <div key={m.id} className="card hover:border-gray-700 transition-colors group relative">
-                <div className="flex items-center justify-between mb-4">
-                  <span className={`badge capitalize text-xs ${statusBadge(m.status)}`}>{m.status}</span>
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                     <button onClick={() => setModal(m)} className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded-lg">{t("common_edit")}</button>
-                     <button onClick={() => handleDelete(m.id)} className="text-xs bg-red-900/40 text-red-400 px-2 py-1 rounded-lg">Del</button>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between text-center mb-6 px-4">
-                  <div className="flex-1">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-red-900/30 border border-red-800 flex items-center justify-center mb-2">
-                       <span className="text-lg">🔴</span>
-                    </div>
-                    <div className="font-bold text-white text-sm">{m.home?.name || "Unknown"}</div>
-                  </div>
-                  <div className="px-2 text-gray-500 text-xs font-black uppercase tracking-widest">VS</div>
-                  <div className="flex-1">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-blue-900/30 border border-blue-800 flex items-center justify-center mb-2">
-                       <span className="text-lg">🔵</span>
-                    </div>
-                    <div className="font-bold text-white text-sm">{m.away?.name || "Unknown"}</div>
-                  </div>
-                </div>
+            {matches.map((m) => {
+              const homeName = m.home_team_id ? (teamsMap[m.home_team_id] || "Unknown") : "Unknown";
+              const awayTeamId = m.set_scores?.away_team_id;
+              const awayName = awayTeamId ? (teamsMap[awayTeamId] || "Unknown") : "Unknown";
 
-                <div className="border-t border-gray-800 pt-3 text-xs text-gray-400 flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span>🏆 {m.competition || "—"}</span>
-                    <span>📍 {m.venue || "—"}</span>
+              return (
+                <div key={m.id} className="card hover:border-gray-700 transition-colors group relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className={`badge capitalize text-xs ${statusBadge(m.status)}`}>{m.status}</span>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                       <button onClick={() => setModal(m)} className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded-lg">{t("common_edit")}</button>
+                       <button onClick={() => handleDelete(m.id)} className="text-xs bg-red-900/40 text-red-400 px-2 py-1 rounded-lg">Del</button>
+                    </div>
                   </div>
-                  <div className="flex items-center text-gray-500">
-                    🕒 {m.match_date ? new Date(m.match_date).toLocaleString(isAR ? "ar-EG" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+                  
+                  <div className="flex items-center justify-between text-center mb-6 px-4">
+                    <div className="flex-1">
+                      <div className="w-12 h-12 mx-auto rounded-full bg-red-900/30 border border-red-800 flex items-center justify-center mb-2">
+                         <span className="text-lg">🔴</span>
+                      </div>
+                      <div className="font-bold text-white text-sm">{homeName}</div>
+                    </div>
+                    <div className="px-2 text-gray-500 text-xs font-black uppercase tracking-widest">VS</div>
+                    <div className="flex-1">
+                      <div className="w-12 h-12 mx-auto rounded-full bg-blue-900/30 border border-blue-800 flex items-center justify-center mb-2">
+                         <span className="text-lg">🔵</span>
+                      </div>
+                      <div className="font-bold text-white text-sm">{awayName}</div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-800 pt-3 text-xs text-gray-400 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span>🏆 {m.competition || "—"}</span>
+                      <span>📍 {m.venue || "—"}</span>
+                    </div>
+                    <div className="flex items-center text-gray-500">
+                      🕒 {m.match_date ? new Date(m.match_date).toLocaleString(isAR ? "ar-EG" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
