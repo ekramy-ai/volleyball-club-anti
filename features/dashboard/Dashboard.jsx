@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../../src/lib/supabase";
 import { Link } from "react-router-dom";
+import { seedDatabase } from "../../src/lib/seeder";
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
@@ -116,7 +117,10 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t("dashboard_title")}</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white">{t("dashboard_title")}</h1>
+            <button onClick={seedDatabase} className="bg-yellow-500 hover:bg-yellow-600 text-black text-xs font-bold px-2 py-1 rounded shadow" title="Temporary Seed Button">🚀 Seed Test Data</button>
+          </div>
           <p className="text-gray-400 text-sm mt-0.5">{t("dashboard_welcome")} · {dateStr}</p>
         </div>
         <div className="flex flex-wrap gap-2">
