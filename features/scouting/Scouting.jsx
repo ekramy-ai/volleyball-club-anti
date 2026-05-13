@@ -40,28 +40,59 @@ export default function Scouting() {
   const [loading, setLoading] = useState(true);
   const [rosterZoneOpen, setRosterZoneOpen] = useState(null);
 
-  // New: Raw Code Input
   const [rawCodeInput, setRawCodeInput] = useState("");
   const inputRef = useRef(null);
 
+  // 1. Load Matches
   useEffect(() => {
-    async function load() {
+    async function loadMatches() {
       setLoading(true);
-      const [mRes, pRes] = await Promise.all([
-        supabase.from("matches").select("id, competition, teams(name)").order("match_date", { ascending: false }).limit(10),
-        supabase.from("players").select("id, full_name, jersey_number, position").order("jersey_number", { ascending: true })
-      ]);
-      setMatches(mRes.data || []);
-      setPlayers(pRes.data || []);
-      if (mRes.data?.length > 0) setMatchId(mRes.data[0].id);
+      const { data } = await supabase
+        .from("matches")
+        // we specify teams!home_team_id(name) because matches has a relation to teams table
+        .select("id, competition, home_team_id, teams!home_team_id(name)")
+        .order("match_date", { ascending: false })
+        .limit(15);
+      
+      setMatches(data || []);
+      if (data?.length > 0) setMatchId(data[0].id);
       setLoading(false);
     }
-    load();
+    loadMatches();
   }, []);
 
+  // 2. Load Players dynamically based on the selected match's home_team_id
+  useEffect(() => {
+    async function loadPlayers() {
+      if (!matchId) return;
+      const match = matches.find(m => m.id === matchId);
+      if (!match || !match.home_team_id) {
+        setPlayers([]);
+        return;
+      }
+      const { data } = await supabase
+        .from("players")
+        .select("id, full_name, jersey_number, position, team_id")
+        .eq("team_id", match.home_team_id)
+        .order("jersey_number", { ascending: true });
+      
+      setPlayers(data || []);
+      
+      // Clear court and selections when match changes
+      setHomeCourt({ 1: null, 2: null, 3: null, 4: null, 5: null, 6: null });
+      setSelectedPlayer(null);
+    }
+    loadPlayers();
+  }, [matchId, matches]);
+
+  // 3. Load Events
   const loadEvents = useCallback(async () => {
     if (!matchId) return;
-    const { data } = await supabase.from("scouting_events").select("*, players(id, full_name, jersey_number)").eq("match_id", matchId).order("created_at", { ascending: true });
+    const { data } = await supabase
+      .from("scouting_events")
+      .select("*, players(id, full_name, jersey_number)")
+      .eq("match_id", matchId)
+      .order("created_at", { ascending: true });
     setEvents(data || []);
   }, [matchId]);
 
@@ -70,7 +101,6 @@ export default function Scouting() {
   // Keep focus on input
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Don't focus if user is typing in a different input/textarea
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
       if (inputRef.current) inputRef.current.focus();
     };
@@ -88,7 +118,6 @@ export default function Scouting() {
     const s = SKILLS.find(x => x.db === selectedSkill);
     const r = RESULTS.find(x => x.db === resDb);
     
-    // Generate code string for the log
     const codeString = `*${p.jersey_number}${s.code}${r.sym}`;
 
     const payload = { match_id: matchId, player_id: selectedPlayer, skill: selectedSkill, result: resDb, notes: `RAW:${codeString}` };
@@ -109,8 +138,6 @@ export default function Scouting() {
     let code = rawCodeInput.trim().toUpperCase();
     if (!code) return;
 
-    // Parse logic: prefix(optional) + jersey(1-2 digits) + skill(1 char) + result(1 char)
-    // Prefix: '*' = Home, 'A' or '#' = Away. Default Home.
     let isHome = true;
     let prefix = '*';
     if (code.startsWith('*')) { isHome = true; code = code.slice(1); }
@@ -164,7 +191,6 @@ export default function Scouting() {
   const homeName = matchInfo?.teams?.name || "HOME";
   const awayName = "AWAY";
 
-  // Calculate Scores (Support both teams now via RAW notes parsing)
   let ourScore = 0;
   let oppScore = 0;
   events.forEach(e => {
@@ -178,11 +204,9 @@ export default function Scouting() {
     }
   });
 
-  // Analytics for BOTH teams
   const playerStats = useMemo(() => {
     const stats = {};
     
-    // Init Home players
     players.forEach(p => { 
       stats[`HOME_${p.id}`] = { id: p.id, jersey: p.jersey_number, name: p.full_name, isHome: true, pts:0, err:0, att:0, attPts:0, attErr:0, rec:0, recPos:0, srv:0, srvErr:0 }; 
     });
@@ -195,7 +219,6 @@ export default function Scouting() {
       if (isHome && e.player_id) {
         pKey = `HOME_${e.player_id}`;
       } else {
-        // Extract jersey from notes (e.g. RAW:#5A=)
         const match = e.notes?.match(/^RAW:[*A#](\d+)/i);
         if (match) jersey = parseInt(match[1], 10);
         pKey = `AWAY_${jersey}`;
@@ -222,15 +245,14 @@ export default function Scouting() {
         recEff: p.rec > 0 ? Math.round((p.recPos / p.rec) * 100) + "%" : "-"
       }))
       .sort((a,b)=> {
-        if (a.isHome !== b.isHome) return a.isHome ? -1 : 1; // Group by team
-        return b.pts - a.pts; // Then by points
+        if (a.isHome !== b.isHome) return a.isHome ? -1 : 1; 
+        return b.pts - a.pts; 
       });
   }, [events, players]);
 
   return (
     <div className="min-h-screen bg-[#dcdcdc] text-black font-sans pb-10">
       
-      {/* HEADER */}
       <div className="bg-black p-2 flex items-center justify-between text-white">
         <div className="flex gap-4 items-center">
           <span className="font-bold text-lg px-4 text-red-500">DATA SCOUT</span>
@@ -245,7 +267,6 @@ export default function Scouting() {
 
       <div className="p-4 max-w-[1400px] mx-auto">
         
-        {/* SCOREBOARD */}
         <div className="flex justify-center items-center gap-4 mb-6">
           <div className="bg-red-600 text-white font-bold text-2xl px-16 py-2 rounded shadow">{homeName}</div>
           <div className="bg-red-600 text-white font-black text-4xl px-4 py-2 rounded shadow">{ourScore}</div>
@@ -258,7 +279,6 @@ export default function Scouting() {
 
         <div className="flex gap-6 items-start">
           
-          {/* ROSTER */}
           <div className="w-48 flex flex-col gap-1 bg-white p-2 rounded shadow">
             <h3 className="font-bold border-b pb-1 mb-2 text-center text-red-700">{homeName}</h3>
             {players.map(p => (
@@ -270,21 +290,23 @@ export default function Scouting() {
                 <span className={selectedPlayer === p.id ? "text-red-600 font-black" : "text-gray-800"}>{p.full_name.split(" ")[0]}</span>
               </div>
             ))}
+            {players.length === 0 && (
+              <div className="text-xs text-center text-gray-500 py-4">
+                {isAR ? "لا يوجد لاعبين في هذا الفريق." : "No players in this team."}
+              </div>
+            )}
           </div>
 
-          {/* COURT & TEXT INPUT */}
           <div className="flex flex-col items-center gap-2">
-            <div className="flex flex-col items-center border-[3px] border-black p-1 bg-white">
-              {/* Away Court */}
+            <div className="flex flex-col items-center border-[3px] border-black p-1 bg-white relative">
               <div className="w-[300px] h-[150px] bg-[#d9d9d9] grid grid-cols-3 grid-rows-2">
                 {AWAY_ZONES.map(z => (
                   <div key={`away-${z}`} className="flex items-center justify-center">
-                    <div className="w-12 h-12 rounded-full bg-blue-800 text-white font-bold flex items-center justify-center text-xl opacity-90">{z}</div>
+                    <div className="w-12 h-12 rounded-full bg-blue-800 text-white font-bold flex items-center justify-center text-xl opacity-90 shadow-inner">{z}</div>
                   </div>
                 ))}
               </div>
               <div className="w-[320px] h-1.5 bg-black my-1"></div>
-              {/* Home Court */}
               <div className="w-[300px] h-[150px] bg-[#d9d9d9] grid grid-cols-3 grid-rows-2">
                 {HOME_ZONES.map(z => {
                   const pId = homeCourt[z];
@@ -294,18 +316,21 @@ export default function Scouting() {
                     <div key={`home-${z}`} className="flex items-center justify-center relative">
                       {p ? (
                         <button onClick={() => setSelectedPlayer(p.id)} onDoubleClick={() => setRosterZoneOpen(z)}
-                          className={`w-12 h-12 rounded-full font-bold flex items-center justify-center text-xl transition-all border-2 ${
-                            isSel ? "bg-white text-red-600 border-red-600 ring-2 ring-red-600" : "bg-red-600 text-white border-black"
+                          className={`w-12 h-12 rounded-full font-bold flex items-center justify-center text-xl transition-all border-2 shadow-lg ${
+                            isSel ? "bg-white text-red-600 border-red-600 ring-2 ring-red-600 scale-110" : "bg-red-600 text-white border-black"
                           }`}>
                           {p.jersey_number}
                         </button>
                       ) : (
-                        <button onClick={() => setRosterZoneOpen(z)} className="w-12 h-12 rounded-full bg-white/50 border border-dashed border-gray-500 text-gray-500 font-bold">+</button>
+                        <button onClick={() => setRosterZoneOpen(z)} className="w-12 h-12 rounded-full bg-white/50 border-2 border-dashed border-gray-500 text-gray-500 font-bold hover:bg-white">+</button>
                       )}
                       {rosterZoneOpen === z && (
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 w-32 bg-white border border-gray-400 rounded shadow-2xl z-50 p-1">
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 w-36 bg-white border border-gray-400 rounded shadow-2xl z-50 p-1 max-h-40 overflow-y-auto">
+                          <div className="text-[10px] text-gray-500 font-bold mb-1 text-center bg-gray-100 py-1">Assign to Zone {z}</div>
                           {players.map(pl => (
-                            <div key={pl.id} onClick={() => assignToCourt(z, pl.id)} className="text-xs p-1 hover:bg-gray-200 cursor-pointer text-black">#{pl.jersey_number} {pl.full_name.split(" ")[0]}</div>
+                            <div key={pl.id} onClick={() => assignToCourt(z, pl.id)} className="text-xs p-1 hover:bg-gray-200 cursor-pointer text-black border-b border-gray-100">
+                              <span className="font-bold mr-1">#{pl.jersey_number}</span> {pl.full_name.split(" ")[0]}
+                            </div>
                           ))}
                         </div>
                       )}
@@ -315,22 +340,20 @@ export default function Scouting() {
               </div>
             </div>
 
-            {/* RAW CODE TEXT INPUT */}
-            <form onSubmit={handleCodeSubmit} className="w-full flex mt-2 shadow">
-              <span className="bg-red-600 text-white font-bold px-3 py-2 text-sm flex items-center justify-center">Code</span>
+            <form onSubmit={handleCodeSubmit} className="w-full flex mt-2 shadow border-2 border-red-600 rounded overflow-hidden focus-within:ring-2 focus-within:ring-red-400 transition-all">
+              <span className="bg-red-600 text-white font-bold px-3 py-2 text-sm flex items-center justify-center uppercase">Code</span>
               <input 
                 ref={inputRef}
                 value={rawCodeInput}
                 onChange={(e) => setRawCodeInput(e.target.value)}
                 placeholder="*12A# or a4S="
-                className="flex-1 bg-white border-y border-r border-gray-400 px-3 py-2 outline-none font-mono text-lg uppercase tracking-widest text-black focus:bg-yellow-50 transition-colors"
+                className="flex-1 bg-white px-3 py-2 outline-none font-mono text-lg uppercase tracking-widest text-black focus:bg-yellow-50 transition-colors"
                 autoComplete="off"
               />
               <button type="submit" className="hidden">Submit</button>
             </form>
           </div>
 
-          {/* RIGHT: BUTTON PAD & CODES LIST */}
           <div className="flex-1 flex flex-col gap-4">
             
             <div className="bg-white p-3 rounded shadow border border-gray-300">
@@ -365,7 +388,7 @@ export default function Scouting() {
             <div className="bg-white rounded shadow border border-gray-300 flex-1 overflow-hidden flex flex-col max-h-72">
               <div className="bg-gray-200 p-2 text-xs font-bold flex justify-between items-center border-b border-gray-300">
                 <span>CODES LIST</span>
-                <button onClick={undoLast} className="bg-white px-2 py-0.5 rounded border border-gray-400 text-gray-700 hover:bg-gray-100">Undo</button>
+                <button onClick={undoLast} className="bg-white px-2 py-0.5 rounded border border-gray-400 text-gray-700 hover:bg-gray-100 shadow-sm">Undo</button>
               </div>
               <div className="overflow-y-auto p-1 text-sm font-mono flex-1 bg-white">
                 {[...events].reverse().map(e => {
@@ -388,12 +411,12 @@ export default function Scouting() {
                     </div>
                   );
                 })}
+                {events.length === 0 && <div className="text-center text-gray-400 py-4 text-xs">No events logged</div>}
               </div>
             </div>
           </div>
         </div>
 
-        {/* ANALYSIS TABLE */}
         <div className="mt-6 bg-white rounded shadow border border-gray-300">
           <div className="bg-gray-200 p-2 text-sm font-bold border-b border-gray-300 flex justify-between">
             <span>MATCH ANALYSIS (BOTH TEAMS)</span>
