@@ -18,10 +18,14 @@ function PlayerModal({ player, onClose, onSaved }) {
   const isAR = i18n.language === "ar";
   const isEdit = Boolean(player?.id);
   
+  const [clubs, setClubs] = useState([]);
   const [teams, setTeams] = useState([]);
+  
   const [form, setForm] = useState({
-    full_name:     player?.full_name     || "",
+    club_id:       player?.club_id       || "",
     team_id:       player?.team_id       || "",
+    full_name:     player?.full_name     || "",
+    photo_url:     player?.photo_url     || "",
     position:      player?.position      || "setter",
     jersey_number: player?.jersey_number || "",
     date_of_birth: player?.date_of_birth || "",
@@ -31,22 +35,33 @@ function PlayerModal({ player, onClose, onSaved }) {
     weight_kg:     player?.weight_kg     || "",
     experience_level: player?.experience_level || "intermediate",
   });
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    supabase.from("teams").select("id, name").order("name").then(({ data }) => setTeams(data || []));
+    supabase.from("clubs").select("id, name").order("name").then(({ data }) => setClubs(data || []));
   }, []);
+
+  useEffect(() => {
+    if (!form.club_id) {
+      setTeams([]);
+      return;
+    }
+    supabase.from("teams").select("id, name").eq("club_id", form.club_id).order("name").then(({ data }) => setTeams(data || []));
+  }, [form.club_id]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.full_name.trim()) { setError(isAR ? "اسم اللاعب مطلوب." : "Player name is required."); return; }
+    if (!form.club_id) { setError(isAR ? "يرجى اختيار النادي" : "Please select a club"); return; }
     
     setLoading(true); setError("");
     const payload = {
       ...form,
+      club_id:       form.club_id       || null,
       team_id:       form.team_id       || null,
       jersey_number: form.jersey_number ? Number(form.jersey_number) : null,
       height_cm:     form.height_cm     ? Number(form.height_cm)     : null,
@@ -56,10 +71,10 @@ function PlayerModal({ player, onClose, onSaved }) {
     try {
       let result;
       if (isEdit) {
-        const { data, error: err } = await supabase.from("players").update(payload).eq("id", player.id).select("*, teams(name)").single();
+        const { data, error: err } = await supabase.from("players").update(payload).eq("id", player.id).select("*, teams(name), clubs(name)").single();
         if (err) throw err; result = data;
       } else {
-        const { data, error: err } = await supabase.from("players").insert(payload).select("*, teams(name)").single();
+        const { data, error: err } = await supabase.from("players").insert(payload).select("*, teams(name), clubs(name)").single();
         if (err) throw err; result = data;
       }
       onSaved(result, isEdit);
@@ -80,20 +95,44 @@ function PlayerModal({ player, onClose, onSaved }) {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && <div className="bg-red-900/40 border border-red-700 text-red-300 text-sm rounded-lg px-3 py-2">⚠️ {error}</div>}
           
+          <div className="flex justify-center mb-4">
+            <div className="w-24 h-24 rounded-full bg-gray-800 border-2 border-gray-700 overflow-hidden flex items-center justify-center">
+              {form.photo_url ? <img src={form.photo_url} alt="Avatar" className="w-full h-full object-cover" /> : <span className="text-3xl">👤</span>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-red-400 mb-1">{isAR ? "النادي التابع له *" : "Belonging Club *"}</label>
+              <select value={form.club_id} onChange={(e) => { set("club_id", e.target.value); set("team_id", ""); }} required
+                className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:border-red-500">
+                <option value="">-- {isAR ? "اختر النادي" : "Select Club"} --</option>
+                {clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs text-blue-400 font-bold mb-1">{isAR ? "الفريق" : "Team"}</label>
+              <select value={form.team_id} onChange={(e) => set("team_id", e.target.value)} disabled={!form.club_id}
+                className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:border-red-500 disabled:opacity-50">
+                <option value="">-- {isAR ? "بدون فريق / حر" : "No Team / Free Agent"} --</option>
+                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="block text-xs text-gray-400 mb-1">{isAR ? "الاسم الكامل *" : "Full Name *"}</label>
               <input value={form.full_name} onChange={(e) => set("full_name", e.target.value)}
                 className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:border-red-500" />
             </div>
-            
+
             <div className="col-span-2">
-              <label className="block text-xs text-gray-400 mb-1">{isAR ? "الفريق" : "Team"}</label>
-              <select value={form.team_id} onChange={(e) => set("team_id", e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:border-red-500">
-                <option value="">-- {isAR ? "بدون فريق / حر" : "No Team / Free Agent"} --</option>
-                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              <label className="block text-xs text-gray-400 mb-1">{isAR ? "صورة اللاعب الشخصية (URL)" : "Player Photo URL"}</label>
+              <input value={form.photo_url} onChange={(e) => set("photo_url", e.target.value)}
+                placeholder="https://..."
+                className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:border-red-500 text-left" dir="ltr" />
             </div>
 
             <div>
@@ -175,6 +214,9 @@ export default function Players() {
   const isAR = i18n.language === "ar";
   
   const [players, setPlayers] = useState([]);
+  const [clubs, setClubs] = useState([]);
+  const [selectedClubId, setSelectedClubId] = useState("All");
+  
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
   const [filter,  setFilter]  = useState("All");
@@ -184,7 +226,10 @@ export default function Players() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const { data, error: err } = await supabase.from("players").select("*, teams(name)").order("full_name");
+      const { data: clubsData } = await supabase.from("clubs").select("id, name").order("name");
+      setClubs(clubsData || []);
+
+      const { data, error: err } = await supabase.from("players").select("*, teams(name), clubs(name)").order("full_name");
       if (err) throw err;
       setPlayers(data || []);
     } catch (err) {
@@ -210,8 +255,9 @@ export default function Players() {
 
   const filtered = players.filter((p) => {
     const matchPos    = filter === "All" || p.position === filter;
+    const matchClub   = selectedClubId === "All" || p.club_id === selectedClubId;
     const matchSearch = !search || p.full_name?.toLowerCase().includes(search.toLowerCase());
-    return matchPos && matchSearch;
+    return matchPos && matchClub && matchSearch;
   });
 
   return (
@@ -222,7 +268,7 @@ export default function Players() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">{t("nav_players")}</h1>
-            <p className="text-gray-400 text-sm mt-0.5">{players.length} {isAR ? "لاعب مسجل" : "registered players"}</p>
+            <p className="text-gray-400 text-sm mt-0.5">{isAR ? "إدارة لاعبي ولاعبات الأندية" : "Manage clubs players"}</p>
           </div>
           <button onClick={() => setModal("create")} className="btn-primary text-sm">➕ {isAR ? "إضافة لاعب" : "Add Player"}</button>
         </div>
@@ -234,11 +280,18 @@ export default function Players() {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col md:flex-row gap-3">
+          <select value={selectedClubId} onChange={e => setSelectedClubId(e.target.value)}
+             className="bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-500 md:w-64">
+             <option value="All">{isAR ? "جميع الأندية" : "All Clubs"}</option>
+             {clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+
           <input value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder={isAR ? "🔍 ابحث عن لاعب..." : "🔍 Search players…"}
-            className="bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-500 sm:w-64" />
-          <div className="flex gap-1.5 flex-wrap">
+            className="bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-500 md:w-64" />
+          
+          <div className="flex gap-1.5 flex-wrap flex-1 justify-end">
             {POSITIONS.map((p) => (
               <button key={p} onClick={() => setFilter(p)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -255,42 +308,59 @@ export default function Players() {
           <div className="card flex flex-col items-center justify-center py-20 text-center">
             <div className="text-5xl mb-4">🤾</div>
             <h2 className="text-lg font-semibold text-white mb-2">
-              {search || filter !== "All" ? (isAR ? "لا يوجد لاعبين يطابقون الفلتر" : "No players match filter") : (isAR ? "لا يوجد لاعبين" : "No players yet")}
+              {search || filter !== "All" || selectedClubId !== "All" ? (isAR ? "لا يوجد لاعبين يطابقون الفلتر" : "No players match filter") : (isAR ? "لا يوجد لاعبين" : "No players yet")}
             </h2>
             <button onClick={() => setModal("create")} className="btn-primary mt-4">➕ {isAR ? "إضافة لاعب" : "Add Player"}</button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filtered.map((p) => (
-              <div key={p.id} className="card hover:border-gray-700 transition-colors group relative overflow-hidden">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white font-bold text-base shadow-inner">
-                    {p.jersey_number ?? p.full_name?.[0]?.toUpperCase() ?? "?"}
+              <div key={p.id} className="card hover:border-gray-700 transition-colors group relative overflow-hidden flex flex-col items-center p-0">
+                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  <button onClick={() => setModal(p)} className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded-lg shadow">{t("common_edit")}</button>
+                  <button onClick={() => handleDelete(p.id)} className="text-xs bg-red-900/40 hover:bg-red-900 text-red-400 px-2 py-1 rounded-lg shadow">Del</button>
+                </div>
+
+                <div className="w-full bg-gradient-to-b from-gray-800 to-gray-900 pt-6 pb-4 flex flex-col items-center border-b border-gray-800 relative">
+                  <div className="absolute top-2 left-2 text-xs font-bold text-gray-500">
+                     #{p.jersey_number || "?"}
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-white text-sm truncate">{p.full_name}</p>
-                    <p className="text-xs text-gray-400 truncate">{p.teams?.name || (isAR ? "لاعب حر (بدون فريق)" : "Free Agent")}</p>
+                  <div className="w-24 h-24 rounded-full border-4 border-gray-900 shadow-xl overflow-hidden bg-gray-800 flex items-center justify-center mb-3">
+                     {p.photo_url ? (
+                       <img src={p.photo_url} alt={p.full_name} className="w-full h-full object-cover" />
+                     ) : (
+                       <span className="text-4xl text-gray-500 font-bold">{p.full_name?.[0]?.toUpperCase() ?? "?"}</span>
+                     )}
                   </div>
+                  <h3 className="font-bold text-white text-base text-center px-4 truncate w-full">{p.full_name}</h3>
+                  <div className="text-xs text-red-400 font-semibold mt-1">🛡️ {p.clubs?.name || (isAR ? "نادي غير معروف" : "Unknown Club")}</div>
+                  <div className="text-xs text-gray-400 mt-0.5 truncate">{p.teams?.name || (isAR ? "لاعب حر (بدون فريق)" : "Free Agent")}</div>
                 </div>
                 
-                <div className="flex gap-2 mb-3 flex-wrap">
-                  <span className={`badge text-xs ${posBadgeColor(p.position)}`}>
-                    {isAR ? POS_LABELS_AR[p.position] : POS_LABELS_EN[p.position] || p.position || "—"}
-                  </span>
-                  <span className="badge bg-gray-800 text-gray-400 text-xs">
-                    {isAR ? EXP_AR[p.experience_level] : EXP_EN[p.experience_level] || p.experience_level || "—"}
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-x-1 border-t border-gray-800 pt-3 text-xs text-gray-500">
-                  <span className="flex items-center gap-1">↕ {p.height_cm ? `${p.height_cm}` : "-"}</span>
-                  <span className="flex items-center gap-1">⚖ {p.weight_kg ? `${p.weight_kg}` : "-"}</span>
-                  <span className="flex items-center gap-1 truncate" title={p.nationality || ""}>🌍 {p.nationality ? p.nationality.slice(0,3).toUpperCase() : "-"}</span>
-                </div>
-                
-                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => setModal(p)} className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded-lg">{t("common_edit")}</button>
-                  <button onClick={() => handleDelete(p.id)} className="text-xs bg-red-900/40 hover:bg-red-900 text-red-400 px-2 py-1 rounded-lg">Del</button>
+                <div className="w-full p-4 flex flex-col gap-3">
+                  <div className="flex gap-2 justify-center flex-wrap">
+                    <span className={`badge text-xs ${posBadgeColor(p.position)}`}>
+                      {isAR ? POS_LABELS_AR[p.position] : POS_LABELS_EN[p.position] || p.position || "—"}
+                    </span>
+                    <span className="badge bg-gray-800 text-gray-400 text-xs">
+                      {isAR ? EXP_AR[p.experience_level] : EXP_EN[p.experience_level] || p.experience_level || "—"}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-x-1 border-t border-gray-800 pt-3 text-xs text-gray-400 font-medium text-center">
+                    <span className="flex flex-col items-center gap-0.5">
+                      <span className="text-[10px] text-gray-600">الطول</span>
+                      <span>{p.height_cm ? `${p.height_cm}cm` : "-"}</span>
+                    </span>
+                    <span className="flex flex-col items-center gap-0.5 border-l border-r border-gray-800">
+                      <span className="text-[10px] text-gray-600">الوزن</span>
+                      <span>{p.weight_kg ? `${p.weight_kg}kg` : "-"}</span>
+                    </span>
+                    <span className="flex flex-col items-center gap-0.5 truncate" title={p.nationality || ""}>
+                      <span className="text-[10px] text-gray-600">الجنسية</span>
+                      <span>{p.nationality ? p.nationality.slice(0,3).toUpperCase() : "-"}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}

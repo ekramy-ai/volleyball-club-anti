@@ -14,6 +14,7 @@ import "./src/index.css";
 
 // ─── Lazy feature modules ─────────────────────────────────────────────────────
 const Dashboard    = lazy(() => import("./features/dashboard/Dashboard"));
+const Clubs        = lazy(() => import("./features/clubs/Clubs"));
 const Teams        = lazy(() => import("./features/teams/Teams"));
 const Players      = lazy(() => import("./features/players/Players"));
 const Matches      = lazy(() => import("./features/matches/Matches"));
@@ -31,6 +32,7 @@ function Sidebar({ collapsed, setCollapsed }) {
 
   const NAV = [
     { key: "nav_dashboard", path: "/dashboard", icon: "⚡" },
+    { key: "nav_clubs",     path: "/clubs",     icon: "🛡️" },
     { key: "nav_teams",     path: "/teams",     icon: "👥" },
     { key: "nav_players",   path: "/players",   icon: "🤾" },
     { key: "nav_matches",   path: "/matches",   icon: "🏐" },
@@ -176,6 +178,7 @@ function App() {
                 <Routes>
                   <Route path="/"           element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard"  element={<Dashboard />} />
+                  <Route path="/clubs"      element={<Clubs />} />
                   <Route path="/teams"      element={<Teams />} />
                   <Route path="/players"    element={<Players />} />
                   <Route path="/matches"    element={<Matches />} />

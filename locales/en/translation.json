@@ -3,6 +3,7 @@
   "app_tagline": "Professional Volleyball Management Platform",
 
   "nav_dashboard": "Dashboard",
+  "nav_clubs": "Clubs",
   "nav_teams": "Teams",
   "nav_players": "Players",
   "nav_matches": "Matches",
