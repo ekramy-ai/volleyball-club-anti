@@ -75,74 +75,146 @@ export default function AIAssistant() {
   const generateResponse = (phase, query) => {
     if (phase === "pre") {
       return isAR ? `
-**تحليل فترة الإعداد (Pre-Season Analysis):**
+📊 التقرير التحليلي الشامل لفترة الإعداد (PRE-SEASON DOSSIER)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+استناداً إلى قواعد بيانات الموسم الماضي والمقاييس الحيوية للصفقات الجديدة:
 
-بناءً على أرقام الموسم الماضي وبيانات الصفقات الجديدة:
-1. **الأساس التكتيكي (Tactical Baseline):** 
-تحتاج لتعزيز كفاءة الهجوم من المركز 2، حيث كانت نسبة النجاح العام الماضي 41% (أقل من المستهدف 45%).
-2. **الأحمال البدنية (Physical Load):**
-يُنصح بالتركيز على تدريبات القوة الانفجارية (Plyometrics) في الأسابيع الثلاثة الأولى لتحسين ارتقاء المهاجمين.
-3. **مستهدفات (KPIs):**
-الوصول بكفاءة الاستقبال (Perfect Pass) إلى 60% كحد أدنى للمباريات الودية.
+1️⃣ التقييم البدني والفسيولوجي (Baseline Metrics):
+• متوسط ارتقاء الفريق (Spike Reach): 338 سم (أعلى من المعدل العام للبطولة بـ 4 سم).
+• العجز البدني (Deficit): لوحظ انخفاض في قدرة التحمل العضلي للاعبي الارتكاز (MBs) بعد النقطة 20 من كل شوط بنسبة 14%.
+
+2️⃣ التقييم التكتيكي والصفقات (Tactical & Recruitment):
+• اللاعب الوافد (OH #10): يمتلك كفاءة استقبال (Perfect Pass) بنسبة 61%، مما سيسمح بتنويع الهجوم السريع (Pipe) بنسبة 25% إضافية مقارنة بالموسم الماضي.
+• ثغرة التشكيل الحالية: ما زال الفريق يفتقر لمعد احتياطي قادر على اللعب برتم سريع (First Tempo) من خارج المنطقة (Out of System).
+
+3️⃣ مؤشرات الأداء المستهدفة (KPIs) للأسابيع الثلاثة الأولى:
+• الاستقبال: الوصول لنسبة 55% (R#) في المباريات التحضيرية.
+• الهجوم الكلي: فاعلية (Efficiency) لا تقل عن 42%.
+• نسبة الأخطاء المباشرة: تقليل أخطاء الإرسال إلى أقل من 3 أخطاء لكل شوط.
+
+💡 خطة العمل المقترحة (Action Plan):
+- الأسبوع 1-2: التركيز على أحمال القوة الانفجارية (Plyometrics) وتطوير التحمل الخاص بالقفز للاعبي الارتكاز.
+- الأسبوع 3: بدء دمج أنظمة الهجوم المتقدمة وتثبيت تشكيلات الاستقبال في الدوران P1 و P5.
 ` : `
-**Pre-Season Analysis:**
+📊 PRE-SEASON COMPREHENSIVE DOSSIER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Based on historical databases and physical baselines of new signings:
 
-Based on last season's metrics and new signings:
-1. **Tactical Baseline:** 
-Need to improve Zone 2 attack efficiency. Last year was 41% (target is >45%).
-2. **Physical Load:** 
-Focus on Plyometrics in weeks 1-3 to improve attacker vertical reach.
-3. **KPI Targets:** 
-Reach a minimum of 60% Perfect Pass efficiency in friendly matches.
+1️⃣ Physiological & Baseline Metrics:
+• Team Average Spike Reach: 338 cm (+4 cm above league average).
+• Physical Deficit: Middle Blockers (MBs) show a 14% drop in explosive endurance after the 20-point mark in sets.
+
+2️⃣ Tactical & Recruitment Evaluation:
+• New Signing (OH #10): Brings a 61% Perfect Pass efficiency, allowing a projected 25% increase in Pipe attack frequency compared to last season.
+• Roster Gap: The team still lacks a backup setter capable of running First Tempo attacks from out-of-system situations.
+
+3️⃣ Target KPIs (First 3 Weeks):
+• Reception: Achieve a minimum of 55% R# in friendlies.
+• Attack Efficiency: Maintain at least 42% overall efficiency.
+• Error Rate: Reduce direct service errors to <3 per set.
+
+💡 Recommended Action Plan:
+- Weeks 1-2: Prioritize Plyometrics and jump-endurance conditioning tailored for MBs.
+- Week 3: Implement advanced offensive systems and finalize reception formations in P1 & P5 rotations.
 `;
     }
     if (phase === "post") {
       return isAR ? `
-**المراجعة الشاملة للموسم (Post-Season Review):**
+🏆 المراجعة التحليلية الشاملة لنهاية الموسم (POST-SEASON REVIEW)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+تم تحليل أداء الفريق في 34 مباراة رسمية باستخدام خوارزميات Data Volley 4:
 
-1. **أداء اللاعبين (Player Progression):**
-حقق صانع الألعاب الأساسي 85% من المستهدف الرقمي، لكن هناك تراجع في دقة الإعداد للهجوم السريع في الأشواط الخامسة.
-2. **توصيات التعاقدات (Transfers):**
-الفريق بحاجة لمهاجم مركز 4 (OH) بقدرات استقبال عالية (+65%) لتعويض العجز الذي ظهر في المباريات الكبرى.
-3. **برنامج الإجازة (Off-Season):**
-تم إنشاء برامج تعافي وتقوية فردية لكل لاعب بناءً على حمل المباريات الذي تعرض له.
+1️⃣ المراجعة الهجومية والدفاعية (Macro Analytics):
+• الكفاءة الهجومية العامة (Attack Eff): استقرت عند 46% (تجاوزت المستهدف بـ 1%).
+• كفاءة حائط الصد (Block Efficiency): 1.8 صد ناجح لكل شوط (أقل من المعدل المطلوب للبطولة 2.3).
+• نقاط التحول (Break Point %): 38% من الإرسال (ممتاز).
+
+2️⃣ تقييم أداء اللاعبين الفردي (Player Progression):
+• صانع الألعاب الأساسي: التزم بنسبة 82% بخطط التوزيع المتفق عليها، لكن دقة إعداد كرات (Zone 4) انخفضت بنسبة 12% في الأشواط الفاصلة (الشوط الخامس).
+• الليبرو: حقق قفزة نوعية في الدفاع الأرضي بنسبة تحسن 18%، لكن كفاءة الاستقبال للإرسال القوي الموجه (Jump Topspin) ظلت عند 41%.
+
+3️⃣ قرارات الإحلال والتجديد (Roster & Transfers):
+• التوصية الأولى: التعاقد مع لاعب ارتكاز (MB) بديل يتميز بطول القامة وسرعة قراءة صانع الألعاب (Read Blocking)، لسد العجز في حائط الصد.
+• التوصية الثانية: عدم تجديد عقد المهاجم الأجنبي نظراً لانخفاض فاعليته (Efficiency) في المباريات ضد فرق المربع الذهبي إلى 28%.
+
+💡 خطط التوقف (Off-Season):
+- إنشاء ملف تعافي فسيولوجي لثلاثة لاعبين تجاوزوا حاجز الـ 1200 قفزة هذا الموسم لتفادي إصابات الركبة (Patellar Tendinopathy).
 ` : `
-**Post-Season Review:**
+🏆 POST-SEASON COMPREHENSIVE REVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Analysis covering 34 official matches using Data Volley 4 engine:
 
-1. **Player Progression:** 
-Starting setter hit 85% of KPI targets, but accuracy dropped on quick sets during 5th sets.
-2. **Transfer Recommendations:** 
-Team requires an OH with strong receiving capabilities (>65%) to cover gaps exposed in big matches.
-3. **Off-Season Program:** 
-Individualized recovery and strength programs have been generated based on each player's season load.
+1️⃣ Macro Offensive & Defensive Analytics:
+• Overall Attack Efficiency: Settled at 46% (+1% above KPI target).
+• Block Efficiency: 1.8 stuff blocks per set (below the league benchmark of 2.3).
+• Break Point %: 38% conversion rate on our serve (Excellent).
+
+2️⃣ Player Progression & Evaluation:
+• Starting Setter: Adhered to gameplan distribution 82% of the time, but set accuracy to Zone 4 dropped by 12% in tie-break sets.
+• Libero: Exceptional 18% improvement in dig transition, but reception efficiency vs Jump Topspin remains a vulnerability at 41%.
+
+3️⃣ Roster & Transfer Decisions:
+• Recommendation 1: Sign a backup Middle Blocker (MB) with elite Read-Blocking capabilities to resolve our blocking deficit.
+• Recommendation 2: Consider releasing the foreign opposite hitter (OPP) due to a sharp drop in efficiency (28%) against top-4 teams.
+
+💡 Off-Season Directives:
+- Initiate physiological recovery protocols for three players who exceeded the 1,200-jump threshold to prevent Patellar Tendinopathy.
 `;
     }
-    // Default: In-Season
+    
+    // Default: In-Season (Highly Detailed Scouting Report)
     return isAR ? `
-**تحليل تكتيكي عميق (In-Season Tactical Engine):**
+🎯 تقرير الرصد الفني المباشر (LIVE SCOUTING DOSSIER)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+مصدر البيانات: آخر 5 مباريات للخصم | خوارزمية التوقع: مفعلة
 
-بناءً على تحليل آخر 300 حدث רصد للخصم القادم:
-1. **توزيع الإعداد (Setter Distribution):** 
-عندما يكون الاستقبال إيجابياً (+)، يوزع المعد:
-- 45% للمركز 4 (هجوم سريع)
-- 35% للمركز 3 (كرات قصيرة/Quick)
-- 20% للمركز 2 أو الهجوم الخلفي (Pipe)
+1️⃣ التوزيع الهجومي لصانع الألعاب K1 (Setter Distribution)
+[في حالة الاستقبال الإيجابي R# / R+ - نسبة الحدوث: 62%]
+• المركز 4 (هجوم سريع/Shoot): 38% | النجاح: 54% | الفاعلية: 41%
+• المركز 3 (سريع/Quick): 42% | النجاح: 61% | الفاعلية: 50% ⚠️ (تحذير: اعتماد مكثف جداً في P1 و P6)
+• المركز 2 و 6 (Backrow/Pipe): 20% | النجاح: 45% | الفاعلية: 32%
 
-2. **توصية المدرب (Action Plan):**
-- **الإرسال:** وجه الإرسال القصير (Short Serve) إلى المنطقة 2-3 لإجبار المعد على الحركة.
-- **حائط الصد:** اعتمد على خطة (Commit Block) مع المهاجم الأوسط في الدوران P1.
+[في حالة الاستقبال السلبي R- / R! - نسبة الحدوث: 38%]
+• يُجبر صانع الألعاب على اللعب العالي للمركز 4 بنسبة (72%).
+• ميول المهاجم (#11) من المركز 4: يهاجم قطري (Cross-court) بنسبة 65%، خط مستقيم بنسبة 20%، وإسقاط (Tip) 15%.
+
+2️⃣ ثغرات حائط صد الخصم K2 (Opponent Blocking Vulnerabilities)
+• ثغرة الدوران P1: لاعب الارتكاز (MB #15) يميل للقفز المبكر (Commit) مع الهجوم السريع، مما يترك فجوة زمنية (0.8 ثانية) لغلق حائط الصد على الأطراف.
+• التكتيك المضاد: تسريع الرتم الهجومي لمهاجم المركز 4 (Shoot set) لضمان اللعب ضد حائط صد فردي أو ممزق.
+
+3️⃣ تحليل خط الاستقبال (Reception Weaknesses)
+• الليبرو (#7): نقطة قوة، تجنب الإرسال عليه.
+• الضارب المستقبل (#4): نقطة ضعف رئيسية. الاستقبال السلبي لديه 45% عند توجيه إرسال متموج (Float) بين المنطقة 5 و 6 (Seam).
+
+💡 خطة عمل المدير الفني (HEAD COACH ACTION PLAN):
+1. الإرسال (Service): الإرسال الهجومي بشراسة بين 5 و 6 لعزل اللاعب #4. خلط الإرسال بكرات قصيرة للمنطقة 2 لإخراج المعد من نظامه.
+2. حائط الصد (Blocking): في حالة الاستقبال الجيد، نفذ (Commit Block) على لاعب ارتكازهم في دورانات P1/P6، مع توجيه الدفاع لتغطية الهجوم القطري الحاد. في الكرات العالية، التزام بحائط صد مزدوج قوي على مركز 4 وإغلاق الزاوية القطرية تماماً.
 ` : `
-**Deep Tactical Analysis (In-Season Engine):**
+🎯 LIVE SCOUTING DOSSIER (PRE-MATCH TACTICAL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Data Source: Opponent's last 5 matches | Predictive Engine: Active
 
-Based on 300 scouting events of the upcoming opponent:
-1. **Setter Distribution (Perfect Pass +):**
-- 45% to Zone 4 (Fast Tempo)
-- 35% to Zone 3 (Quick/Meter)
-- 20% to Zone 2 or Backrow (Pipe)
+1️⃣ Setter Distribution - K1 Phase
+[On Perfect/Good Pass (R# / R+) - Occurrence: 62%]
+• Zone 4 (Fast Tempo): 38% | Kill: 54% | Eff: 41%
+• Zone 3 (Quick/Meter): 42% | Kill: 61% | Eff: 50% ⚠️ (Warning: Heavy reliance in P1 & P6)
+• Zone 2 / Pipe: 20% | Kill: 45% | Eff: 32%
 
-2. **Action Plan:**
-- **Service:** Implement short tactical serves to zones 2-3 to force the setter out of system.
-- **Blocking:** Use a Commit Block strategy on their Middle Blocker specifically during P1 rotation.
+[On Negative Pass (R- / R!) - Occurrence: 38%]
+• Setter forces high balls to Zone 4 heavily (72%).
+• Zone 4 Attacker (#11) Tendencies: 65% Cross-court (Diagonal), 20% Line, 15% Off-speed Tips.
+
+2️⃣ Opponent Blocking Vulnerabilities (K2)
+• Rotation P1 Flaw: Opponent MB (#15) commits early to quick attacks, creating a 0.8-second delay in closing the outside block.
+• Counter Tactic: Run accelerated tempos (Shoot sets) to our Zone 4 to ensure attacking against a single or split block.
+
+3️⃣ Reception Line Analysis
+• Libero (#7): Elite laterally. Avoid serving.
+• OH2 (#4): Primary Target. Drops to 45% negative reception when targeted with deep floats in the Zone 5/6 seam.
+
+💡 HEAD COACH ACTION PLAN:
+1. Service Strategy: Aggressively target the 5/6 seam to isolate OH2 (#4). Mix with short floats to Zone 2 specifically when their setter is back-row.
+2. Blocking & Defense: On opponent R+, execute a Commit Block against their MB in P1/P6 rotations. On high balls, form a solid double block on Zone 4 taking away the cross-court angle (65% tendency), positioning the defensive Libero deep in Zone 5.
 `;
   };
 
