@@ -1,6 +1,7 @@
 // features/ai/AIAssistant.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { supabase } from "../../src/lib/supabase";
 
 export default function AIAssistant() {
   const { t, i18n } = useTranslation();
@@ -11,6 +12,27 @@ export default function AIAssistant() {
   const [isTyping, setIsTyping] = useState(false);
   const [analysisType, setAnalysisType] = useState("tactical");
   const [seasonPhase, setSeasonPhase] = useState("in");
+
+  const [clubs, setClubs] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [selectedClub, setSelectedClub] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState("");
+
+  useEffect(() => {
+    supabase.from("clubs").select("id, name").order("name").then(({ data }) => setClubs(data || []));
+  }, []);
+
+  useEffect(() => {
+    if (selectedClub) {
+      supabase.from("teams").select("id, name").eq("club_id", selectedClub).order("name").then(({ data }) => {
+        setTeams(data || []);
+        setSelectedTeam("");
+      });
+    } else {
+      setTeams([]);
+      setSelectedTeam("");
+    }
+  }, [selectedClub]);
 
   const PHASE_PROMPTS = {
     pre: isAR ? [
@@ -177,11 +199,20 @@ Based on 300 scouting events of the upcoming opponent:
           </div>
 
           <div>
-            <label className="block text-xs text-gray-400 mb-1">{isAR ? "البيانات المصدرية" : "Source Data"}</label>
-            <select className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded px-3 py-2 text-sm focus:border-red-500">
-              <option>Full Season Database</option>
-              <option>Last 5 Matches</option>
-              <option>Opponent Historical Data</option>
+            <label className="block text-xs text-gray-400 mb-1">{isAR ? "اختر النادي" : "Select Club"}</label>
+            <select value={selectedClub} onChange={e => setSelectedClub(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded px-3 py-2 text-sm focus:border-red-500">
+              <option value="">-- {isAR ? "اختر النادي" : "Club"} --</option>
+              {clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">{isAR ? "اختر الفريق (مصدر بيانات اللاعبين)" : "Select Team (Player Data)"}</label>
+            <select value={selectedTeam} onChange={e => setSelectedTeam(e.target.value)} disabled={!selectedClub}
+              className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded px-3 py-2 text-sm focus:border-red-500 disabled:opacity-50">
+              <option value="">-- {isAR ? "اختر الفريق" : "Team"} --</option>
+              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
         </div>
@@ -246,14 +277,18 @@ Based on 300 scouting events of the upcoming opponent:
               onKeyDown={(e) => e.key === "Enter" && send()}
               placeholder={isAR ? "اكتب طلبك الفني أو استفسارك هنا..." : "Type your technical request or query here..."}
               className="flex-1 bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-red-500 shadow-inner" />
-            <button onClick={send} disabled={!input.trim() || isTyping} className="btn-primary px-6 rounded-lg font-bold shadow-lg disabled:opacity-50 flex items-center gap-2">
+            <button onClick={send} disabled={!input.trim() || isTyping || !selectedTeam} className="btn-primary px-6 rounded-lg font-bold shadow-lg disabled:opacity-50 flex items-center gap-2">
               <span>{isAR ? "تحليل" : "Analyze"}</span>
               <span>⚡</span>
             </button>
           </div>
           <div className="flex justify-between items-center mt-2 px-1">
             <span className="text-[10px] text-gray-500 font-medium">Powered by XURA AI & DV4 Engine</span>
-            <span className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Database Connected</span>
+            {selectedTeam ? (
+              <span className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> {isAR ? "تم ربط بيانات لاعبي الفريق" : "Team Data Linked"}</span>
+            ) : (
+              <span className="text-[10px] text-red-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span> {isAR ? "يرجى تحديد الفريق للبدء" : "Select a team to start"}</span>
+            )}
           </div>
         </div>
 
