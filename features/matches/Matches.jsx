@@ -7,10 +7,7 @@ function MatchModal({ match, onClose, onSaved }) {
   const { t, i18n } = useTranslation();
   const isAR = i18n.language === "ar";
   const isEdit = Boolean(match?.id);
-  
   const [teams, setTeams] = useState([]);
-  
-  // Extract away_team_id from set_scores JSONB to avoid schema FK errors
   const savedAwayTeamId = match?.set_scores?.away_team_id || "";
 
   const [form, setForm] = useState({
@@ -39,10 +36,7 @@ function MatchModal({ match, onClose, onSaved }) {
       setError(isAR ? "لا يمكن أن يكون الفريقان متطابقين!" : "Home and Away teams cannot be the same!");
       return;
     }
-
     setLoading(true); setError("");
-    
-    // We store the away team inside set_scores JSON to bypass the foreign key constraint on away_team_id pointing to opponents
     const payload = {
       home_team_id: form.home_team_id || null,
       competition: form.competition,
@@ -51,7 +45,6 @@ function MatchModal({ match, onClose, onSaved }) {
       notes: form.notes,
       set_scores: { ...(match?.set_scores || {}), away_team_id: form.away_team_id || null }
     };
-
     if (form.match_date) payload.match_date = new Date(form.match_date).toISOString();
     else payload.match_date = null;
 
@@ -65,50 +58,45 @@ function MatchModal({ match, onClose, onSaved }) {
         if (err) throw err; result = data;
       }
       onSaved(result, isEdit);
-    } catch (err) { 
-      setError(err.message); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl my-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-          <h2 className="text-lg font-bold text-white">{isEdit ? (isAR ? "تعديل المباراة" : "Edit Match") : (isAR ? "مباراة جديدة" : "New Match")}</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-gray-800/50">
+          <h2 className="text-lg font-bold text-white">{isEdit ? (isAR ? "تعديل المباراة" : "مباراة جديدة") : (isAR ? "جدولة مباراة" : "Schedule Match")}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white text-xl">✕</button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && <div className="bg-red-900/40 border border-red-700 text-red-300 text-sm rounded-lg px-3 py-2">⚠️ {error}</div>}
-          
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-red-400 mb-1">{isAR ? "الفريق (Home)" : "Home Team"}</label>
+              <label className="block text-xs font-bold text-red-400 mb-1 uppercase tracking-wider">{isAR ? "الفريق المضيف" : "Home Team"}</label>
               <select value={form.home_team_id} onChange={(e) => set("home_team_id", e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500">
+                className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-red-500 shadow-inner">
                 <option value="">-- {isAR ? "اختر" : "Select"} --</option>
                 {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-blue-400 mb-1">{isAR ? "الخصم (Away)" : "Away Team"}</label>
+              <label className="block text-xs font-bold text-blue-400 mb-1 uppercase tracking-wider">{isAR ? "الفريق الضيف" : "Away Team"}</label>
               <select value={form.away_team_id} onChange={(e) => set("away_team_id", e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 shadow-inner">
                 <option value="">-- {isAR ? "اختر" : "Select"} --</option>
                 {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">{isAR ? "البطولة / المنافسة" : "Competition"}</label>
-            <input value={form.competition} onChange={(e) => set("competition", e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
+            <label className="block text-xs text-gray-400 mb-1">{isAR ? "المنافسة / البطولة" : "Competition"}</label>
+            <input value={form.competition} onChange={(e) => set("competition", e.target.value)} placeholder="e.g. Egyptian Super League"
+              className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-red-500 shadow-inner" />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">{isAR ? "الملعب" : "Venue"}</label>
-            <input value={form.venue} onChange={(e) => set("venue", e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
+            <label className="block text-xs text-gray-400 mb-1">{isAR ? "الملعب / الصالة" : "Venue"}</label>
+            <input value={form.venue} onChange={(e) => set("venue", e.target.value)} placeholder="e.g. Cairo Stadium Hall 1"
+              className="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-red-500 shadow-inner" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -124,10 +112,9 @@ function MatchModal({ match, onClose, onSaved }) {
               </select>
             </div>
           </div>
-          
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-4">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">{t("common_cancel")}</button>
-            <button type="submit" disabled={loading} className="btn-primary flex-1 disabled:opacity-50">
+            <button type="submit" disabled={loading} className="btn-primary flex-1 disabled:opacity-50 font-bold shadow-lg">
               {loading ? (isAR ? "جارٍ الحفظ..." : "Saving...") : t("common_save")}
             </button>
           </div>
@@ -140,9 +127,6 @@ function MatchModal({ match, onClose, onSaved }) {
 export default function Matches() {
   const { t, i18n } = useTranslation();
   const isAR = i18n.language === "ar";
-  
-  const TABS = isAR ? ["الكل", "قادمة", "مكتملة", "مباشر"] : ["All", "Upcoming", "Completed", "Live"];
-  const [tab, setTab] = useState(TABS[0]);
   const [matches, setMatches] = useState([]);
   const [teamsMap, setTeamsMap] = useState({});
   const [loading, setLoading] = useState(true);
@@ -152,14 +136,10 @@ export default function Matches() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      // 1. Fetch matches
-      const { data: matchData, error: matchErr } = await supabase.from("matches").select("*").order("match_date", { ascending: true });
+      const { data: matchData, error: matchErr } = await supabase.from("matches").select("*").order("match_date", { ascending: false });
       if (matchErr) throw matchErr;
-      
-      // 2. Fetch teams mapping to manually assign names without relying on complex SQL foreign keys
       const { data: teamData, error: teamErr } = await supabase.from("teams").select("id, name");
       if (teamErr) throw teamErr;
-      
       const tMap = {};
       teamData.forEach(t => tMap[t.id] = t.name);
       setTeamsMap(tMap);
@@ -170,7 +150,7 @@ export default function Matches() {
   useEffect(() => { load(); }, [load]);
 
   const handleSaved = (match, isEdit) => {
-    setMatches((prev) => isEdit ? prev.map((m) => (m.id === match.id ? match : m)) : [...prev, match]);
+    setMatches((prev) => isEdit ? prev.map((m) => (m.id === match.id ? match : m)) : [match, ...prev]);
     setModal(null);
   };
 
@@ -182,78 +162,113 @@ export default function Matches() {
   };
 
   const statusBadge = (s) => {
-    const colors = { scheduled: "bg-blue-900/60 text-blue-300", live: "bg-red-900/60 text-red-300 animate-pulse", completed: "bg-green-900/60 text-green-300", postponed: "bg-yellow-900/60 text-yellow-300", cancelled: "bg-gray-800 text-gray-400" };
-    return colors[s] || "bg-gray-800 text-gray-400";
+    const colors = { 
+      scheduled: "bg-blue-900/40 text-blue-400 border-blue-900", 
+      live: "bg-red-900/40 text-red-500 border-red-900 animate-pulse font-black", 
+      completed: "bg-green-900/40 text-green-400 border-green-900", 
+      postponed: "bg-yellow-900/40 text-yellow-400 border-yellow-900", 
+      cancelled: "bg-gray-800 text-gray-500 border-gray-700" 
+    };
+    return colors[s] || "bg-gray-800 text-gray-400 border-gray-700";
   };
 
   return (
     <>
       {modal && <MatchModal match={modal === "create" ? null : modal} onClose={() => setModal(null)} onSaved={handleSaved} />}
-      <div className="space-y-6 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between">
+      <div className="space-y-8 max-w-7xl mx-auto pb-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">{t("nav_matches")}</h1>
-            <p className="text-gray-400 text-sm mt-0.5">{isAR ? "المباريات بين الفرق المسجلة بالنظام" : "Matches between registered teams"}</p>
+            <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
+              <span className="text-red-600">🏐</span> {t("nav_matches")}
+            </h1>
+            <p className="text-gray-400 text-sm mt-1">{isAR ? "مركز إدارة المباريات والنتائج الحية" : "Match management & live results center"}</p>
           </div>
-          <button onClick={() => setModal("create")} className="btn-primary text-sm">➕ {isAR ? "جدولة مباراة" : "Schedule Match"}</button>
+          <button onClick={() => setModal("create")} className="btn-primary text-sm font-bold shadow-xl shadow-red-900/20 px-6 py-3 rounded-xl flex items-center gap-2">
+            <span>➕</span> {isAR ? "جدولة مباراة جديدة" : "Schedule New Match"}
+          </button>
         </div>
 
         {error && (
-          <div className="card border-red-800 bg-red-900/20 text-red-300 text-sm flex items-start gap-3">
+          <div className="card border-red-800 bg-red-900/20 text-red-300 text-sm flex items-start gap-3 shadow-lg">
             <span className="text-xl">⚠️</span>
             <div><p className="font-semibold">{t("common_supabase_error")}</p><p className="text-xs mt-0.5">{error}</p></div>
           </div>
         )}
 
         {loading ? (
-          <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /></div>
+          <div className="flex justify-center py-24"><div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin" /></div>
         ) : matches.length === 0 ? (
-          <div className="card flex flex-col items-center justify-center py-20 text-center">
-            <div className="text-5xl mb-4">🏐</div>
-            <h2 className="text-lg font-semibold text-white mb-2">{isAR ? "لا توجد مباريات" : "No matches found"}</h2>
-            <button onClick={() => setModal("create")} className="btn-primary mt-4">➕ {isAR ? "جدولة مباراة" : "Schedule Match"}</button>
+          <div className="bg-gray-900/50 border-2 border-dashed border-gray-800 rounded-[2.5rem] flex flex-col items-center justify-center py-24 text-center px-6">
+            <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner border border-gray-700">🏐</div>
+            <h2 className="text-2xl font-black text-white mb-2">{isAR ? "لا توجد مباريات مجدولة" : "No matches scheduled yet"}</h2>
+            <p className="text-gray-400 max-w-sm mb-8">{isAR ? "ابدأ بجدولة أول مباراة لك أو استخدم أداة ملء البيانات في الإعدادات." : "Start by scheduling your first match or use the seed tool in settings."}</p>
+            <button onClick={() => setModal("create")} className="btn-primary px-8 py-3 rounded-xl font-bold shadow-xl shadow-red-900/20">➕ {isAR ? "جدولة مباراة" : "Schedule Match"}</button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {matches.map((m) => {
-              const homeName = m.home_team_id ? (teamsMap[m.home_team_id] || "Unknown") : "Unknown";
+              const homeName = m.home_team_id ? (teamsMap[m.home_team_id] || "Team A") : "Team A";
               const awayTeamId = m.set_scores?.away_team_id;
-              const awayName = awayTeamId ? (teamsMap[awayTeamId] || "Unknown") : "Unknown";
+              const awayName = awayTeamId ? (teamsMap[awayTeamId] || "Team B") : "Team B";
 
               return (
-                <div key={m.id} className="card hover:border-gray-700 transition-colors group relative">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className={`badge capitalize text-xs ${statusBadge(m.status)}`}>{m.status}</span>
+                <div key={m.id} className="group relative bg-[#1a1a1a] border border-gray-800 rounded-[2rem] p-6 shadow-xl hover:border-gray-600 transition-all hover:-translate-y-1 flex flex-col h-full overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                  
+                  <div className="flex items-center justify-between mb-6 relative z-10">
+                    <span className={`px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest shadow-sm ${statusBadge(m.status)}`}>
+                      {m.status}
+                    </span>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                       <button onClick={() => setModal(m)} className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded-lg">{t("common_edit")}</button>
-                       <button onClick={() => handleDelete(m.id)} className="text-xs bg-red-900/40 text-red-400 px-2 py-1 rounded-lg">Del</button>
+                       <button onClick={() => setModal(m)} className="bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-lg shadow-lg border border-gray-700">✏️</button>
+                       <button onClick={() => handleDelete(m.id)} className="bg-red-900/40 hover:bg-red-900 text-white p-2 rounded-lg shadow-lg border border-red-800">🗑️</button>
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-between text-center mb-6 px-4">
-                    <div className="flex-1">
-                      <div className="w-12 h-12 mx-auto rounded-full bg-red-900/30 border border-red-800 flex items-center justify-center mb-2">
-                         <span className="text-lg">🔴</span>
+                  <div className="flex items-center justify-between text-center mb-8 relative z-10">
+                    <div className="flex-1 space-y-3">
+                      <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-red-600/20 to-red-900/40 border border-red-800/50 flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+                         <span className="text-3xl">🛡️</span>
                       </div>
-                      <div className="font-bold text-white text-sm">{homeName}</div>
+                      <div className="font-black text-white text-sm line-clamp-1 uppercase tracking-tight">{homeName}</div>
                     </div>
-                    <div className="px-2 text-gray-500 text-xs font-black uppercase tracking-widest">VS</div>
-                    <div className="flex-1">
-                      <div className="w-12 h-12 mx-auto rounded-full bg-blue-900/30 border border-blue-800 flex items-center justify-center mb-2">
-                         <span className="text-lg">🔵</span>
+                    
+                    <div className="px-4 flex flex-col items-center">
+                       <div className="text-[10px] text-gray-600 font-black uppercase tracking-[0.3em] mb-1">VS</div>
+                       <div className="w-px h-8 bg-gradient-to-b from-gray-800 via-gray-700 to-gray-800"></div>
+                    </div>
+
+                    <div className="flex-1 space-y-3">
+                      <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-600/20 to-blue-900/40 border border-blue-800/50 flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+                         <span className="text-3xl">⚔️</span>
                       </div>
-                      <div className="font-bold text-white text-sm">{awayName}</div>
+                      <div className="font-black text-white text-sm line-clamp-1 uppercase tracking-tight">{awayName}</div>
                     </div>
                   </div>
 
-                  <div className="border-t border-gray-800 pt-3 text-xs text-gray-400 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <span>🏆 {m.competition || "—"}</span>
-                      <span>📍 {m.venue || "—"}</span>
+                  <div className="mt-auto space-y-3 relative z-10">
+                    <div className="bg-black/40 border border-gray-800/50 p-4 rounded-2xl flex flex-col gap-2 shadow-inner">
+                      <div className="flex items-center justify-between text-[11px] font-bold">
+                        <span className="text-gray-500 uppercase tracking-wider">🏆 {m.competition || "Exhibition"}</span>
+                        <span className="text-gray-500 uppercase tracking-wider">📍 {m.venue || "TBD"}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-400 text-xs mt-1">
+                        <span className="bg-gray-800 p-1 rounded-md">📅</span>
+                        <span className="font-medium">
+                          {m.match_date ? new Date(m.match_date).toLocaleString(isAR ? "ar-EG" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center text-gray-500">
-                      🕒 {m.match_date ? new Date(m.match_date).toLocaleString(isAR ? "ar-EG" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : "—"}
-                    </div>
+                    
+                    {m.status === 'live' ? (
+                       <Link to="/scouting" className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-red-900/30 transition-all active:scale-95">
+                         <span>📡</span> {isAR ? "فتح غرفة الرصد" : "Enter Scouting Room"}
+                       </Link>
+                    ) : (
+                       <div className="w-full bg-gray-800 text-gray-500 font-bold text-[10px] uppercase tracking-widest py-3 rounded-xl flex items-center justify-center">
+                         {isAR ? "المباراة ليست مباشرة" : "Match not in progress"}
+                       </div>
+                    )}
                   </div>
                 </div>
               );
