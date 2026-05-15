@@ -13,6 +13,7 @@
   "nav_training": "التدريب",
   "nav_ai": "مساعد الذكاء الاصطناعي",
   "nav_reports": "التقارير",
+  "nav_users": "إدارة الصلاحيات",
   "nav_settings": "الإعدادات",
 
   "dashboard_title": "لوحة التحكم",
@@ -183,5 +184,13 @@
   "common_supabase_hint": "أضف بيانات Supabase إلى ملف .env.",
   "common_not_set": "غير محدد",
   "common_live": "● مباشر",
-  "common_copyright": "XURA v1.0"
+  "common_copyright": "XURA v1.0",
+  "auth_logout": "تسجيل الخروج",
+  "users_title": "إدارة المستخدمين",
+  "users_subtitle": "إدارة أعضاء الفريق وصلاحياتهم في النظام",
+  "users_member": "العضو",
+  "users_club": "النادي",
+  "users_role": "الدور المعين",
+  "users_permissions": "الصلاحيات الفعلية",
+  "users_write_modules": "وحدات الكتابة المتاحة"
 }

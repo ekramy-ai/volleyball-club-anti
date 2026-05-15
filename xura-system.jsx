@@ -26,6 +26,7 @@ const Analytics    = lazy(() => import("./features/analytics/Analytics"));
 const Training     = lazy(() => import("./features/training/Training"));
 const AIAssistant  = lazy(() => import("./features/ai/AIAssistant"));
 const Reports      = lazy(() => import("./features/reports/Reports"));
+const UserManagement = lazy(() => import("./features/users/UserManagement"));
 const Settings     = lazy(() => import("./features/settings/Settings"));
 
 // ─── Protected Route Component ───────────────────────────────────────────────
@@ -64,6 +65,7 @@ function Sidebar({ collapsed, setCollapsed }) {
     { key: "nav_training",  path: "/training",  icon: "💪", module: "training" },
     { key: "nav_ai",        path: "/ai",        icon: "🤖", module: "ai" },
     { key: "nav_reports",   path: "/reports",   icon: "📄", module: "reports" },
+    { key: "nav_users",     path: "/users",     icon: "🔑", module: "users" },
     { key: "nav_settings",  path: "/settings",  icon: "⚙️", module: "settings" },
   ];
 
@@ -243,6 +245,7 @@ function AppContent() {
                   <Route path="/training" element={<ProtectedRoute module="training"><Training /></ProtectedRoute>} />
                   <Route path="/ai" element={<ProtectedRoute module="ai"><AIAssistant /></ProtectedRoute>} />
                   <Route path="/reports" element={<ProtectedRoute module="reports"><Reports /></ProtectedRoute>} />
+                  <Route path="/users" element={<ProtectedRoute module="users"><UserManagement /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute module="settings"><Settings /></ProtectedRoute>} />
                   
                   <Route path="*" element={

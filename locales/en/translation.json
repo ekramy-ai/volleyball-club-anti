@@ -13,6 +13,7 @@
   "nav_training": "Training",
   "nav_ai": "AI Assistant",
   "nav_reports": "Reports",
+  "nav_users": "Access Control",
   "nav_settings": "Settings",
 
   "dashboard_title": "Dashboard",
@@ -183,5 +184,13 @@
   "common_supabase_hint": "Add your Supabase credentials to .env file.",
   "common_not_set": "Not set",
   "common_live": "● Live",
-  "common_copyright": "XURA v1.0"
+  "common_copyright": "XURA v1.0",
+  "auth_logout": "Logout",
+  "users_title": "User Management",
+  "users_subtitle": "Manage team members and their system permissions",
+  "users_member": "Member",
+  "users_club": "Club",
+  "users_role": "Assigned Role",
+  "users_permissions": "Effective Permissions",
+  "users_write_modules": "Write modules available"
 }
