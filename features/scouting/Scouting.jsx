@@ -54,6 +54,7 @@ export default function Scouting() {
 
   const [rawCodeInput, setRawCodeInput] = useState("");
   const inputRef = useRef(null);
+  const [activeTab, setActiveTab] = useState("manual"); // "manual" or "import"
 
   useEffect(() => {
     async function loadMatches() {
@@ -225,6 +226,115 @@ export default function Scouting() {
     setSelectedPlayerTeam(teamType);
   };
 
+  const clearMatchEvents = async () => {
+    if (!matchId) return;
+    const confirmClear = window.confirm(
+      isAR 
+        ? "هل أنت متأكد من مسح جميع الأحداث المسجلة لهذه المباراة؟ لا يمكن التراجع عن هذا الإجراء." 
+        : "Are you sure you want to clear all events for this match? This action cannot be undone."
+    );
+    if (!confirmClear) return;
+
+    try {
+      const { error } = await supabase
+        .from("scouting_events")
+        .delete()
+        .eq("match_id", matchId);
+      if (error) throw error;
+      setEvents([]);
+      alert(isAR ? "تم مسح جميع الأحداث بنجاح." : "All events cleared successfully.");
+    } catch(err) {
+      console.error(err);
+      alert(isAR ? "حدث خطأ أثناء مسح الأحداث: " + err.message : "Error clearing events: " + err.message);
+    }
+  };
+
+  const handleDvwUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const text = evt.target.result;
+      const lines = text.split(/\r?\n/);
+      
+      let inScoutSection = false;
+      const parsedEvents = [];
+
+      for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+
+        if (line.startsWith("[3SCOUT]")) {
+          inScoutSection = true;
+          continue;
+        } else if (line.startsWith("[")) {
+          inScoutSection = false; // exited scout section
+          continue;
+        }
+
+        if (inScoutSection) {
+          const parts = line.split(";");
+          let code = parts[0]?.trim().toUpperCase();
+          if (!code) continue;
+
+          let prefix = '';
+          let cleanCode = code;
+          if (code.startsWith('*')) { prefix = '*'; cleanCode = code.slice(1); }
+          else if (code.startsWith('A') || code.startsWith('#')) { prefix = code[0]; cleanCode = code.slice(1); }
+          else { continue; } // Not a valid code line
+
+          const matchRegex = cleanCode.match(/^(\d{1,2})([SREABDF])([=\-/+#])([HQFP]?)/);
+          if (matchRegex) {
+            const jersey = parseInt(matchRegex[1], 10);
+            const skillCode = matchRegex[2];
+            const resultCode = matchRegex[3];
+            const subSkill = matchRegex[4] || "";
+
+            const s = SKILLS.find(x => x.code === skillCode);
+            const r = RESULTS.find(x => x.sym === resultCode);
+
+            if (s && r) {
+              const isHome = prefix === '*';
+              const roster = isHome ? homePlayers : awayPlayers;
+              const p = roster.find(x => x.jersey_number === jersey);
+              const pId = p ? p.id : null;
+
+              const finalCodeStr = `${prefix}${jersey}${skillCode}${subSkill}${resultCode}`;
+              parsedEvents.push({
+                match_id: matchId,
+                player_id: pId,
+                skill: s.db,
+                result: r.db,
+                notes: `RAW:${finalCodeStr}`
+              });
+            }
+          }
+        }
+      }
+
+      if (parsedEvents.length === 0) {
+        alert(isAR ? "لم يتم العثور على أي أحداث رصد صالحة في الملف." : "No valid scouting events found in the file.");
+        return;
+      }
+
+      try {
+        const chunkSize = 50;
+        for (let i = 0; i < parsedEvents.length; i += chunkSize) {
+          const chunk = parsedEvents.slice(i, i + chunkSize);
+          const { error } = await supabase.from("scouting_events").insert(chunk);
+          if (error) throw error;
+        }
+        alert(isAR ? `تم استيراد ${parsedEvents.length} حدث بنجاح!` : `Successfully imported ${parsedEvents.length} events!`);
+        loadEvents();
+      } catch(err) {
+        console.error(err);
+        alert(isAR ? "حدث خطأ أثناء استيراد الملف: " + err.message : "Error importing file: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const matchInfo = matches.find(m => m.id === matchId);
   const homeName = matchInfo?.home_team_id ? (teamsMap[matchInfo.home_team_id] || "Home Team") : "Home Team";
   const awayName = matchInfo?.set_scores?.away_team_id ? (teamsMap[matchInfo.set_scores.away_team_id] || "Away Team") : "Away Team";
@@ -322,6 +432,32 @@ export default function Scouting() {
           <div className="bg-[#1a1a1a] text-white border-r-4 border-r-blue-800 font-bold text-xl md:text-2xl px-6 md:px-16 py-3 shadow-lg text-center min-w-[200px] truncate">{awayName}</div>
         </div>
 
+        {/* Tab Selection */}
+        <div className="flex justify-center mb-6">
+          <div className="bg-[#1a1a1a] p-1.5 rounded-xl border border-gray-800 flex gap-2 shadow-2xl">
+            <button 
+              onClick={() => setActiveTab("manual")} 
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                activeTab === "manual" 
+                  ? "bg-red-600 text-white shadow-lg shadow-red-900/20 scale-105" 
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+            >
+              <span>🏐</span> {isAR ? "رصد مباشر (يدوي)" : "Live Scouting (Manual)"}
+            </button>
+            <button 
+              onClick={() => setActiveTab("import")} 
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                activeTab === "import" 
+                  ? "bg-red-600 text-white shadow-lg shadow-red-900/20 scale-105" 
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+            >
+              <span>📁</span> {isAR ? "رفع وتحليل ملف DataVolley" : "Import & Analyze DataVolley (.dvw)"}
+            </button>
+          </div>
+        </div>
+
         <div className="flex gap-4 items-start flex-col xl:flex-row">
           
           {/* Home Roster Sidebar */}
@@ -341,133 +477,189 @@ export default function Scouting() {
           </div>
 
           <div className="flex flex-col items-center gap-4 flex-1 w-full">
-            
-            {/* Visual Court Grid DV4 Style */}
-            <div className="flex flex-col items-center border-4 border-orange-500/20 p-2 bg-[#222] relative rounded-xl shadow-2xl">
-              <div dir="ltr" className="w-[300px] sm:w-[400px] h-[150px] sm:h-[200px] bg-[#df9753] grid grid-cols-3 grid-rows-2 shadow-inner relative">
-                {AWAY_ZONES.map(z => {
-                  const pId = awayCourt[z];
-                  const p = awayPlayers.find(x => x.id === pId);
-                  const isSel = selectedPlayer === pId && pId !== null;
-                  return (
-                    <div key={`away-${z}`} className="flex items-center justify-center relative border border-white/10">
-                      <span className="absolute top-1 left-1 text-[10px] font-black text-white/30 z-0">{z}</span>
-                      {p ? (
-                        <button onClick={() => selectPlayerForAction(p.id, 'away')} onDoubleClick={() => setRosterZoneOpen({ side: 'away', zone: z })}
-                          className={`z-10 w-10 h-10 sm:w-14 sm:h-14 rounded-full font-black flex items-center justify-center text-lg sm:text-xl transition-all shadow-xl border-2 ${
-                            isSel ? "bg-white text-blue-800 border-blue-800 ring-4 ring-blue-800/30 scale-125" : "bg-blue-800 text-white border-[#df9753]"
-                          }`}>
-                          {p.jersey_number}
-                        </button>
-                      ) : (
-                        <button onClick={() => setRosterZoneOpen({ side: 'away', zone: z })} className="w-10 h-10 rounded-full bg-black/10 border-2 border-dashed border-white/30 text-white/50 font-bold hover:bg-black/20">+</button>
-                      )}
-                      {rosterZoneOpen.side === 'away' && rosterZoneOpen.zone === z && (
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 p-1 max-h-48 overflow-y-auto">
-                          <div className="text-[10px] text-gray-400 font-bold mb-1 text-center bg-gray-800 py-1 rounded">Assign Zone {z}</div>
-                          {awayPlayers.map(pl => (
-                            <div key={pl.id} onClick={() => assignToCourt('away', z, pl.id)} className="text-xs p-2 hover:bg-gray-800 cursor-pointer text-gray-200 border-b border-gray-800">
-                              <span className="font-bold text-blue-400 mr-2">#{pl.jersey_number}</span> {pl.full_name}
+            {activeTab === "manual" ? (
+              <>
+                {/* Visual Court Grid DV4 Style */}
+                <div className="flex flex-col items-center border-4 border-orange-500/20 p-2 bg-[#222] relative rounded-xl shadow-2xl">
+                  <div dir="ltr" className="w-[300px] sm:w-[400px] h-[150px] sm:h-[200px] bg-[#df9753] grid grid-cols-3 grid-rows-2 shadow-inner relative">
+                    {AWAY_ZONES.map(z => {
+                      const pId = awayCourt[z];
+                      const p = awayPlayers.find(x => x.id === pId);
+                      const isSel = selectedPlayer === pId && pId !== null;
+                      return (
+                        <div key={`away-${z}`} className="flex items-center justify-center relative border border-white/10">
+                          <span className="absolute top-1 left-1 text-[10px] font-black text-white/30 z-0">{z}</span>
+                          {p ? (
+                            <button onClick={() => selectPlayerForAction(p.id, 'away')} onDoubleClick={() => setRosterZoneOpen({ side: 'away', zone: z })}
+                              className={`z-10 w-10 h-10 sm:w-14 sm:h-14 rounded-full font-black flex items-center justify-center text-lg sm:text-xl transition-all shadow-xl border-2 ${
+                                isSel ? "bg-white text-blue-800 border-blue-800 ring-4 ring-blue-800/30 scale-125" : "bg-blue-800 text-white border-[#df9753]"
+                              }`}>
+                              {p.jersey_number}
+                            </button>
+                          ) : (
+                            <button onClick={() => setRosterZoneOpen({ side: 'away', zone: z })} className="w-10 h-10 rounded-full bg-black/10 border-2 border-dashed border-white/30 text-white/50 font-bold hover:bg-black/20">+</button>
+                          )}
+                          {rosterZoneOpen.side === 'away' && rosterZoneOpen.zone === z && (
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 p-1 max-h-48 overflow-y-auto">
+                              <div className="text-[10px] text-gray-400 font-bold mb-1 text-center bg-gray-800 py-1 rounded">Assign Zone {z}</div>
+                              {awayPlayers.map(pl => (
+                                <div key={pl.id} onClick={() => assignToCourt('away', z, pl.id)} className="text-xs p-2 hover:bg-gray-800 cursor-pointer text-gray-200 border-b border-gray-800">
+                                  <span className="font-bold text-blue-400 mr-2">#{pl.jersey_number}</span> {pl.full_name}
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              
-              <div className="w-[320px] sm:w-[420px] h-2 bg-white my-1 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
-              
-              <div dir="ltr" className="w-[300px] sm:w-[400px] h-[150px] sm:h-[200px] bg-[#df9753] grid grid-cols-3 grid-rows-2 shadow-inner relative">
-                {HOME_ZONES.map(z => {
-                  const pId = homeCourt[z];
-                  const p = homePlayers.find(x => x.id === pId);
-                  const isSel = selectedPlayer === pId && pId !== null;
-                  return (
-                    <div key={`home-${z}`} className="flex items-center justify-center relative border border-white/10">
-                      <span className="absolute bottom-1 right-1 text-[10px] font-black text-white/30 z-0">{z}</span>
-                      {p ? (
-                        <button onClick={() => selectPlayerForAction(p.id, 'home')} onDoubleClick={() => setRosterZoneOpen({ side: 'home', zone: z })}
-                          className={`z-10 w-10 h-10 sm:w-14 sm:h-14 rounded-full font-black flex items-center justify-center text-lg sm:text-xl transition-all shadow-xl border-2 ${
-                            isSel ? "bg-white text-red-600 border-red-600 ring-4 ring-red-600/30 scale-125" : "bg-red-600 text-white border-[#df9753]"
-                          }`}>
-                          {p.jersey_number}
-                        </button>
-                      ) : (
-                        <button onClick={() => setRosterZoneOpen({ side: 'home', zone: z })} className="w-10 h-10 rounded-full bg-black/10 border-2 border-dashed border-white/30 text-white/50 font-bold hover:bg-black/20">+</button>
-                      )}
-                      {rosterZoneOpen.side === 'home' && rosterZoneOpen.zone === z && (
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 p-1 max-h-48 overflow-y-auto">
-                          <div className="text-[10px] text-gray-400 font-bold mb-1 text-center bg-gray-800 py-1 rounded">Assign Zone {z}</div>
-                          {homePlayers.map(pl => (
-                            <div key={pl.id} onClick={() => assignToCourt('home', z, pl.id)} className="text-xs p-2 hover:bg-gray-800 cursor-pointer text-gray-200 border-b border-gray-800">
-                              <span className="font-bold text-red-400 mr-2">#{pl.jersey_number}</span> {pl.full_name}
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="w-[320px] sm:w-[420px] h-2 bg-white my-1 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
+                  
+                  <div dir="ltr" className="w-[300px] sm:w-[400px] h-[150px] sm:h-[200px] bg-[#df9753] grid grid-cols-3 grid-rows-2 shadow-inner relative">
+                    {HOME_ZONES.map(z => {
+                      const pId = homeCourt[z];
+                      const p = homePlayers.find(x => x.id === pId);
+                      const isSel = selectedPlayer === pId && pId !== null;
+                      return (
+                        <div key={`home-${z}`} className="flex items-center justify-center relative border border-white/10">
+                          <span className="absolute bottom-1 right-1 text-[10px] font-black text-white/30 z-0">{z}</span>
+                          {p ? (
+                            <button onClick={() => selectPlayerForAction(p.id, 'home')} onDoubleClick={() => setRosterZoneOpen({ side: 'home', zone: z })}
+                              className={`z-10 w-10 h-10 sm:w-14 sm:h-14 rounded-full font-black flex items-center justify-center text-lg sm:text-xl transition-all shadow-xl border-2 ${
+                                isSel ? "bg-white text-red-600 border-red-600 ring-4 ring-red-600/30 scale-125" : "bg-red-600 text-white border-[#df9753]"
+                              }`}>
+                              {p.jersey_number}
+                            </button>
+                          ) : (
+                            <button onClick={() => setRosterZoneOpen({ side: 'home', zone: z })} className="w-10 h-10 rounded-full bg-black/10 border-2 border-dashed border-white/30 text-white/50 font-bold hover:bg-black/20">+</button>
+                          )}
+                          {rosterZoneOpen.side === 'home' && rosterZoneOpen.zone === z && (
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 p-1 max-h-48 overflow-y-auto">
+                              <div className="text-[10px] text-gray-400 font-bold mb-1 text-center bg-gray-800 py-1 rounded">Assign Zone {z}</div>
+                              {homePlayers.map(pl => (
+                                <div key={pl.id} onClick={() => assignToCourt('home', z, pl.id)} className="text-xs p-2 hover:bg-gray-800 cursor-pointer text-gray-200 border-b border-gray-800">
+                                  <span className="font-bold text-red-400 mr-2">#{pl.jersey_number}</span> {pl.full_name}
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
-                      )}
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Input & Action Pad */}
+                <div className="w-full max-w-[420px]">
+                  <form onSubmit={handleCodeSubmit} className="flex mb-4 shadow-xl border border-gray-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition-all bg-gray-900">
+                    <span className="bg-gray-800 text-blue-500 font-bold px-4 py-3 text-xs flex items-center justify-center uppercase tracking-widest border-r border-gray-700">INPUT</span>
+                    <input ref={inputRef} value={rawCodeInput} onChange={(e) => setRawCodeInput(e.target.value)}
+                      placeholder="e.g. *12A#HQ or a4S="
+                      className="flex-1 bg-gray-900 px-4 py-3 outline-none font-mono text-xl uppercase tracking-widest text-white placeholder-gray-600 transition-colors"
+                      autoComplete="off" />
+                    <button type="submit" className="hidden">Submit</button>
+                  </form>
+
+                  <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-xl border border-gray-800">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-bold text-gray-500 text-xs tracking-widest uppercase">Action Interface</h3>
+                      <div className="flex items-center gap-3 bg-black px-3 py-1 rounded-lg border border-gray-800">
+                        <span className={`font-black text-xl ${selectedPlayerTeam === 'away' ? 'text-blue-500' : 'text-red-500'}`}>
+                          {selectedPlayer ? `#${getPlayerById(selectedPlayer)?.jersey_number}` : "--"}
+                        </span>
+                        <span className="text-gray-600">|</span>
+                        <span className="font-black text-white text-xl">{selectedSkill ? SKILLS.find(s=>s.db===selectedSkill)?.code : "-"}</span>
+                      </div>
                     </div>
-                  );
-                })}
+                    
+                    <div className="flex gap-3">
+                      <div className="grid grid-cols-4 gap-2 flex-1">
+                        {SKILLS.map(s => (
+                          <button key={s.db} onClick={() => setSelectedSkill(s.db)}
+                            className={`py-3 text-sm font-black rounded-lg transition-all ${selectedSkill === s.db ? "bg-white text-black shadow-[0_0_10px_white]" : "bg-gray-800 border-b-4 border-gray-900 text-gray-400 hover:bg-gray-700 hover:text-white"}`}>
+                            {s.code}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex flex-col gap-2 w-16">
+                        {RESULTS.map(r => (
+                          <button key={r.db} onClick={() => handleResultClick(r.db)}
+                            className={`flex-1 font-black rounded-lg shadow-lg text-lg transition-all hover:brightness-110 active:scale-95 py-2 ${r.color}`}>
+                            {r.sym}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-gray-800">
+                      <div className="text-[10px] text-gray-600 mb-2 uppercase tracking-widest font-bold">Sub-Skills (Hit Types)</div>
+                      <div className="flex gap-2">
+                        {SUB_SKILLS.map(sk => (
+                          <button key={sk.code} onClick={() => setRawCodeInput(prev => prev + sk.code)}
+                            className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-1.5 rounded text-xs font-mono font-bold transition-colors border border-gray-700">
+                            {sk.code}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="w-full max-w-2xl bg-[#1a1a1a] p-6 rounded-2xl border border-gray-800 shadow-2xl space-y-6">
+                <div className="border-b border-gray-800 pb-4">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <span className="text-red-500">📁</span>
+                    {isAR ? "استيراد ملفات DataVolley (.dvw)" : "Import DataVolley (.dvw) File"}
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {isAR 
+                      ? "قم برفع ملفات الرصد بصيغة DVW لتحليل كامل الإحصائيات والأحداث المسجلة للمباراة." 
+                      : "Upload standard volleyball scouting files in DVW format to run stats and parse code logs."}
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-700 hover:border-red-500 rounded-xl p-8 text-center cursor-pointer transition-all bg-[#111]/50 relative group">
+                  <input 
+                    type="file" 
+                    accept=".dvw" 
+                    onChange={handleDvwUpload} 
+                    className="absolute inset-0 opacity-0 cursor-pointer" 
+                  />
+                  <span className="text-4xl mb-3 group-hover:scale-110 transition-transform">🏐</span>
+                  <span className="text-sm font-bold text-gray-300">
+                    {isAR ? "اضغط هنا لاختيار ملف أو اسحبه إلى هنا" : "Click to browse or drag & drop DVW file"}
+                  </span>
+                  <span className="text-xs text-gray-500 mt-1">
+                    {isAR ? "صيغة الملف المدعومة: .dvw" : "Supported format: .dvw"}
+                  </span>
+                </div>
+
+                <div className="bg-red-950/20 border border-red-900/50 p-4 rounded-xl text-xs space-y-2">
+                  <h4 className="font-bold text-red-400 flex items-center gap-2">
+                    <span>⚠️</span> {isAR ? "تنبيه هام" : "Important Warning"}
+                  </h4>
+                  <p className="text-gray-400 leading-relaxed text-right">
+                    {isAR 
+                      ? "الرفع سيقوم بإضافة الأحداث المدرجة في الملف إلى أحداث المباراة الحالية. يرجى مسح الأحداث السابقة أولاً إذا كنت ترغب في بدء رصد نظيف."
+                      : "Uploading will append the events listed in the file to the current match events. Clean the match events first if you want a clean import."}
+                  </p>
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <button 
+                    onClick={clearMatchEvents} 
+                    className="bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-500 px-4 py-2 rounded-xl text-xs font-bold transition-all"
+                  >
+                    🗑️ {isAR ? "مسح كافة أحداث المباراة الحالية" : "Clear All Current Match Events"}
+                  </button>
+                  <span className="text-[10px] text-gray-500 italic">
+                    {isAR ? "متوافق مع معايير FIVB و DV4" : "FIVB and DV4 Compliant"}
+                  </span>
+                </div>
               </div>
-            </div>
-
-            {/* Input & Action Pad */}
-            <div className="w-full max-w-[420px]">
-              <form onSubmit={handleCodeSubmit} className="flex mb-4 shadow-xl border border-gray-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition-all bg-gray-900">
-                <span className="bg-gray-800 text-blue-500 font-bold px-4 py-3 text-xs flex items-center justify-center uppercase tracking-widest border-r border-gray-700">INPUT</span>
-                <input ref={inputRef} value={rawCodeInput} onChange={(e) => setRawCodeInput(e.target.value)}
-                  placeholder="e.g. *12A#HQ or a4S="
-                  className="flex-1 bg-gray-900 px-4 py-3 outline-none font-mono text-xl uppercase tracking-widest text-white placeholder-gray-600 transition-colors"
-                  autoComplete="off" />
-                <button type="submit" className="hidden">Submit</button>
-              </form>
-
-              <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-xl border border-gray-800">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-gray-500 text-xs tracking-widest uppercase">Action Interface</h3>
-                  <div className="flex items-center gap-3 bg-black px-3 py-1 rounded-lg border border-gray-800">
-                    <span className={`font-black text-xl ${selectedPlayerTeam === 'away' ? 'text-blue-500' : 'text-red-500'}`}>
-                      {selectedPlayer ? `#${getPlayerById(selectedPlayer)?.jersey_number}` : "--"}
-                    </span>
-                    <span className="text-gray-600">|</span>
-                    <span className="font-black text-white text-xl">{selectedSkill ? SKILLS.find(s=>s.db===selectedSkill)?.code : "-"}</span>
-                  </div>
-                </div>
-                
-                <div className="flex gap-3">
-                  <div className="grid grid-cols-4 gap-2 flex-1">
-                    {SKILLS.map(s => (
-                      <button key={s.db} onClick={() => setSelectedSkill(s.db)}
-                        className={`py-3 text-sm font-black rounded-lg transition-all ${selectedSkill === s.db ? "bg-white text-black shadow-[0_0_10px_white]" : "bg-gray-800 border-b-4 border-gray-900 text-gray-400 hover:bg-gray-700 hover:text-white"}`}>
-                        {s.code}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex flex-col gap-2 w-16">
-                    {RESULTS.map(r => (
-                      <button key={r.db} onClick={() => handleResultClick(r.db)}
-                        className={`flex-1 font-black rounded-lg shadow-lg text-lg transition-all hover:brightness-110 active:scale-95 py-2 ${r.color}`}>
-                        {r.sym}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-gray-800">
-                  <div className="text-[10px] text-gray-600 mb-2 uppercase tracking-widest font-bold">Sub-Skills (Hit Types)</div>
-                  <div className="flex gap-2">
-                    {SUB_SKILLS.map(sk => (
-                      <button key={sk.code} onClick={() => setRawCodeInput(prev => prev + sk.code)}
-                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-1.5 rounded text-xs font-mono font-bold transition-colors border border-gray-700">
-                        {sk.code}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Away Roster Sidebar & Event Log */}
