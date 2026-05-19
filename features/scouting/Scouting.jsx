@@ -344,7 +344,7 @@ export default function Scouting() {
             
             {/* Visual Court Grid DV4 Style */}
             <div className="flex flex-col items-center border-4 border-orange-500/20 p-2 bg-[#222] relative rounded-xl shadow-2xl">
-              <div className="w-[300px] sm:w-[400px] h-[150px] sm:h-[200px] bg-[#df9753] grid grid-cols-3 grid-rows-2 shadow-inner relative">
+              <div dir="ltr" className="w-[300px] sm:w-[400px] h-[150px] sm:h-[200px] bg-[#df9753] grid grid-cols-3 grid-rows-2 shadow-inner relative">
                 {AWAY_ZONES.map(z => {
                   const pId = awayCourt[z];
                   const p = awayPlayers.find(x => x.id === pId);
@@ -379,7 +379,7 @@ export default function Scouting() {
               
               <div className="w-[320px] sm:w-[420px] h-2 bg-white my-1 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
               
-              <div className="w-[300px] sm:w-[400px] h-[150px] sm:h-[200px] bg-[#df9753] grid grid-cols-3 grid-rows-2 shadow-inner relative">
+              <div dir="ltr" className="w-[300px] sm:w-[400px] h-[150px] sm:h-[200px] bg-[#df9753] grid grid-cols-3 grid-rows-2 shadow-inner relative">
                 {HOME_ZONES.map(z => {
                   const pId = homeCourt[z];
                   const p = homePlayers.find(x => x.id === pId);
